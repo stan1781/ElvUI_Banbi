@@ -1,0 +1,42 @@
+## Interface: 30300
+## Title: |cff1784d1E|r|cffe5e3e3lvUI|r |cff1784d1Banbi|r
+## Notes: ElvUI 增强：移速、代币条、聊天栏、装备列表、符文条、装备助手、好友同步（替代 bbTools/TinyInspect/FriendsMenuXP/MotionSpeed/ChatBar TokenBar）
+## Title-zhCN: |cff1784d1E|r|cffe5e3e3lvUI|r |cff1784d1斑比增强|r
+## Author: 斑比
+## Version: 1.0.0
+## SavedVariables: ElvUI_BanbiDB
+## RequiredDeps: ElvUI
+## OptionalDeps: ElvUI_AddOnSkins, BagSync
+## X-License: MIT for project-authored code; bundled dependencies retain their own licenses
+
+Locales\enUS.lua
+Locales\zhCN.lua
+
+Defaults.lua
+Core.lua
+Legacy.lua
+Migrate.lua
+Options.lua
+
+Modules\ClientCompat.lua
+Modules\MotionSpeed.lua
+Modules\AutoTrack.lua
+Modules\TokenBar.lua
+Modules\ChatEmote.lua
+Modules\ChatBar.lua
+Modules\ChatEnhance.lua
+Modules\FriendsMenuXP\localization.enUS.lua
+Modules\FriendsMenuXP\localization.zhCN.lua
+Modules\FriendsMenuXP\ButtonSet.lua
+Modules\FriendsMenuXP\FriendsMenuXP.lua
+Modules\FriendsMenuXP\FriendsMenuXP.xml
+Modules\FriendsMenuXP_Feature.lua
+Modules\FriendSync.lua
+Modules\Inspect\InfoWindow.xml
+Modules\Inspect\InspectGem.lua
+Modules\Inspect\InspectEnchant.lua
+Modules\Inspect\InspectGemEnchant.lua
+Modules\Inspect\InspectPanel.lua
+Modules\RuneBar.lua
+Modules\EquipmentHelper.lua
+Modules\AstralEnhance.lua

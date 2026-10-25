@@ -1,0 +1,31 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+
+	<!-- TinyInspect shell; chrome painted in InspectPanel (DragonUI gold/panel). -->
+	<Frame name="ElvUI_Banbi_InfoWindow" toplevel="true" enableMouse="true" framestrata="HIGH" parent="UIParent" hidden="true">
+		<Size x="350" y="450"/>
+		<Backdrop
+			bgFile="Interface\Tooltips\UI-Tooltip-Background"
+			edgeFile="Interface\Tooltips\UI-Tooltip-Border"
+			tile="true">
+			<EdgeSize><AbsValue val="16"/></EdgeSize>
+			<TileSize><AbsValue val="16"/></TileSize>
+			<BackgroundInsets><AbsInset left="4" right="4" top="4" bottom="4"/></BackgroundInsets>
+		</Backdrop>
+		<Frames>
+			<Button name="$parent_CloseButton" inherits="UIPanelCloseButton">
+				<Anchors>
+					<Anchor point="TOPRIGHT">
+						<Offset x="-1" y="0"/>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						this:GetParent():Hide()
+					</OnClick>
+				</Scripts>
+			</Button>
+		</Frames>
+	</Frame>
+</Ui>
