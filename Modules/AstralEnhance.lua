@@ -196,14 +196,11 @@ local function IsPlainUpgradeText(text)
     if find(text, "已选择", 1, true) or find(text, "可以强化", 1, true) then
         return false
     end
+    -- Distinguishes luck charm via token only — plain upgrade is also 100% at 0/10
     if find(text, LUCK_TOKEN, 1, true) then
         return false
     end
-    -- Luck charm is always 100%; plain upgrade rate changes with level (e.g. 20% @8/10, 10% @9/10)
-    if find(text, "100%", 1, true) then
-        return false
-    end
-    -- Real option:「提升一级强化等级 (成功几率: N%)」— N varies by current level
+    -- Real option:「提升一级强化等级 (成功几率: N%)」(N can be 100% at low levels)
     if find(text, "提升一级", 1, true) and find(text, "成功几率", 1, true) then
         return true
     end
@@ -255,7 +252,6 @@ local function FindUpgradeOption(options)
             break
         elseif find(text, "成功几率", 1, true)
             and not find(text, LUCK_TOKEN, 1, true)
-            and not find(text, "100%", 1, true)
             and not find(text, "每提升", 1, true)
             and not find(text, "将获得", 1, true) then
             fallback = fallback or options[i]
