@@ -212,3 +212,18 @@ L["Astral: item done next"] = "[%s] 已达目标，切换下一件…"
 L["Astral: not in combat"] = "战斗中无法操作"
 L["Astral: combat stop"] = "进入战斗，已停止强化"
 L["Astral: click failed"] = "点击强化选项失败"
+L["Auto Learn Recipes"] = "Auto Learn Recipes"
+L["Auto Learn Recipes Desc"] =
+    "On learning a profession, auto-send .learn all recipes <name> (VIP). Optionally refill when opening a non-max profession."
+L["Auto Learn Recipes Help"] =
+    "VIP can use .learn all recipes. Without permission the server errors; turn this off if unused. Open-refill needs stock/detectable trade-skill UI; DragonUI may not work."
+L["AutoLearn: on learn"] = "Auto-max when learning"
+L["AutoLearn: on learn desc"] = "Send the command when a new profession skill line appears."
+L["AutoLearn: on open"] = "Refill when opening non-max profession"
+L["AutoLearn: on open desc"] =
+    "On TRADE_SKILL_SHOW (or detectable UI), send once per session if rank < max. Off by default."
+L["AutoLearn: professions header"] = "Enabled professions"
+L["AutoLearn: clear session"] = "Clear session sent list"
+L["AutoLearn: clear session desc"] = "Allow auto-send again for the same profession this login."
+L["AutoLearn: fired %s"] = "Auto-learned recipes: %s"
+L["AutoLearn: session cleared"] = "Cleared this session's auto-learn record"

@@ -256,6 +256,7 @@ local function BuildOptions()
             general = BuildTabFromFeatures(L["General"] or "General", 1, {
                 "motionSpeed",
                 "tokenBar",
+                "autoLearnRecipes",
             }, true),
             chat = BuildTabFromFeatures(L["Chat"] or "Chat", 2, {
                 "chatEnhance",

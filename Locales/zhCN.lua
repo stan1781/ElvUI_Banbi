@@ -211,3 +211,18 @@ L["Astral: item done next"] = "[%s] 已达目标，切换下一件…"
 L["Astral: not in combat"] = "战斗中无法操作"
 L["Astral: combat stop"] = "进入战斗，已停止强化"
 L["Astral: click failed"] = "点击强化选项失败"
+L["Auto Learn Recipes"] = "自动学习专业配方"
+L["Auto Learn Recipes Desc"] =
+    "学会专业时自动发送 .learn all recipes（顶 V）；可选打开未满级专业时再补。"
+L["Auto Learn Recipes Help"] =
+    "顶 V 可用 .learn all recipes。无权限时服务器会报错，可自行关闭。打开再补依赖原版/可探测的专业 UI，DragonUI 可能无效。"
+L["AutoLearn: on learn"] = "学会专业时自动满级"
+L["AutoLearn: on learn desc"] = "检测到新专业技能行时发送命令。"
+L["AutoLearn: on open"] = "打开未满级专业时再补"
+L["AutoLearn: on open desc"] =
+    "TRADE_SKILL_SHOW / 可探测 UI 时，未满级且本会话未发过则再发一次。默认关闭。"
+L["AutoLearn: professions header"] = "启用的专业"
+L["AutoLearn: clear session"] = "清空本会话已发送记录"
+L["AutoLearn: clear session desc"] = "允许同一次登录内对同一专业再次自动发送。"
+L["AutoLearn: fired %s"] = "已自动学习配方：%s"
+L["AutoLearn: session cleared"] = "已清空本会话自动学习记录"
