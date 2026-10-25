@@ -79,6 +79,7 @@ addon.defaults = {
                 targetLevel = 9,
                 clickDelay = 0.45,
                 itemFilter = "",
+                attrExclude = "",
                 anchor = "CENTER",
                 relAnchor = "CENTER",
                 posX = 280,

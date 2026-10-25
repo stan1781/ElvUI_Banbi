@@ -32,6 +32,9 @@ local NPC_NAMES = {
 local ATTR_PATTERN = "^(.-)%s*%((%d+)%s*/%s*(%d+)%)%s*$"
 local UPGRADE_PLAIN = "提升一级强化等级"
 local LUCK_TOKEN = "好运符"
+-- Gossip UI often pads with CJK ideographic space (U+3000). Lua 5.1 patterns are
+-- byte-based, so never put　inside []; normalize to ASCII space first.
+local IDEOGRAPHIC_SPACE = "　"
 
 local running = false
 local busy = false
@@ -113,6 +116,81 @@ local function GetTargetLevel()
     return math.floor(n)
 end
 
+local function NormalizeSpaces(s)
+    if not s then
+        return ""
+    end
+    return (gsub(s, IDEOGRAPHIC_SPACE, " "))
+end
+
+local function Trim(s)
+    if not s then
+        return ""
+    end
+    s = NormalizeSpaces(s)
+    return (gsub(s, "^%s*(.-)%s*$", "%1"))
+end
+
+-- Canonical attr key for exclude matching (strip all whitespace).
+local function AttrKey(s)
+    s = Trim(s)
+    if s == "" then
+        return ""
+    end
+    return (gsub(s, "%s+", ""))
+end
+
+-- Build { [attrKey]=true } from cfg.attrExclude ("力量,敏捷" / "力量、敏捷" / "力量，敏捷").
+local function GetAttrExcludeSet()
+    local cfg = Cfg()
+    local raw = cfg and cfg.attrExclude
+    local set = {}
+    if type(raw) ~= "string" or raw == "" then
+        return set
+    end
+    raw = NormalizeSpaces(raw)
+    -- Normalize common Chinese / ASCII separators to ","
+    raw = gsub(raw, "、", ",")
+    raw = gsub(raw, "，", ",")
+    raw = gsub(raw, "；", ",")
+    raw = gsub(raw, ";", ",")
+    raw = gsub(raw, "%s+", ",")
+    for part in string.gmatch(raw, "[^,]+") do
+        local name = AttrKey(part)
+        if name ~= "" then
+            set[name] = true
+        end
+    end
+    return set
+end
+
+local function FormatExcludeList(set)
+    local names = {}
+    for name in pairs(set) do
+        names[#names + 1] = name
+    end
+    if #names == 0 then
+        return ""
+    end
+    table.sort(names)
+    return table.concat(names, ",")
+end
+
+-- Upgrade page status:「已选择强化属性：攻击强度 (3/10)」
+local function ExtractSelectedAttr(options)
+    for i = 1, #options do
+        local text = NormalizeSpaces(options[i].text)
+        local name, cur, maxv = match(text, "已选择强化属性%s*[：:]%s*(.-)%s*%((%d+)%s*/%s*(%d+)%)")
+        if name then
+            name = Trim(name)
+            if name ~= "" then
+                return name, tonumber(cur), tonumber(maxv)
+            end
+        end
+    end
+    return nil
+end
+
 local function GossipOpen()
     return GossipFrame and GossipFrame:IsShown()
 end
@@ -125,6 +203,7 @@ local function StripColors(text)
     text = gsub(text, "|c%x%x%x%x%x%x%x%x", "")
     text = gsub(text, "|r", "")
     text = gsub(text, "|T.-|t", "")
+    text = NormalizeSpaces(text)
     return text
 end
 
@@ -179,7 +258,7 @@ local function ParseAttr(text)
         return nil
     end
     return {
-        name = name,
+        name = Trim(name),
         cur = tonumber(cur),
         max = tonumber(maxv),
     }
@@ -261,9 +340,11 @@ local function FindUpgradeOption(options)
 end
 
 local function FindAttrNeedingUpgrade(attrs, targetLevel)
+    local exclude = GetAttrExcludeSet()
     for i = 1, #attrs do
         local a = attrs[i]
-        if a.cur and a.cur < targetLevel then
+        local key = AttrKey(a.name)
+        if key ~= "" and not exclude[key] and a.cur and a.cur < targetLevel then
             return a
         end
     end
@@ -348,13 +429,14 @@ local function NormalizeItemKey(text)
     end
     local fromLabel = match(text, "已选择物品.-%[(.-)%]")
     if fromLabel and fromLabel ~= "" then
-        return fromLabel
+        return Trim(fromLabel)
     end
     local bracket = match(text, "%[(.-)%]")
     if bracket and bracket ~= "" then
-        return bracket
+        return Trim(bracket)
     end
-    return text
+    local t = Trim(text)
+    return t ~= "" and t or nil
 end
 
 local function IsHeaderOrNavText(text)
@@ -576,6 +658,30 @@ ProcessGossip = function()
     end
 
     if page == "upgrade" then
+        -- Blacklist / target only applied on attr pick before; upgrade page must
+        -- also refuse to keep clicking when current selection is excluded or done.
+        local selName, selCur = ExtractSelectedAttr(options)
+        local exclude = GetAttrExcludeSet()
+        local selKey = selName and AttrKey(selName) or ""
+        if selKey ~= "" and exclude[selKey] then
+            SetStatus(format(
+                L["Astral: skip excluded attr"] or "[%s] 跳过排除属性：%s",
+                currentItemKey or "?",
+                selName
+            ))
+            GoBackOrReopen(options)
+            return
+        end
+        if selName and selCur and selCur >= targetLevel then
+            SetStatus(format(
+                L["Astral: attr done reselect"] or "[%s] %s 已达目标，重选属性…",
+                currentItemKey or "?",
+                selName
+            ))
+            GoBackOrReopen(options)
+            return
+        end
+
         local entry = FindUpgradeOption(options)
         if not entry then
             busy = false
@@ -584,7 +690,13 @@ ProcessGossip = function()
         end
         attempts = attempts + 1
         local label = currentItemKey or "?"
-        SetStatus(format(L["Astral: upgrading item"] or "强化 [%s]… 第 %d 次", label, attempts))
+        local attrLabel = selName and (selName .. " ") or ""
+        SetStatus(format(
+            L["Astral: upgrading item attr"] or "强化 [%s] %s… 第 %d 次",
+            label,
+            attrLabel,
+            attempts
+        ))
         if not ClickOption(entry) then
             busy = false
             StopRun(L["Astral: click failed"] or "点击强化选项失败")
@@ -682,7 +794,14 @@ local function StartRun()
     wipe(knownItemOrder)
     running = true
     busy = false
-    SetStatus(L["Astral: starting"] or "开始… 请靠近 NPC")
+    local excl = GetAttrExcludeSet()
+    local exclText = FormatExcludeList(excl)
+    if exclText ~= "" then
+        Print(format(L["Astral: exclude active"] or "排除属性已生效：%s", exclText))
+        SetStatus(format(L["Astral: starting exclude"] or "开始… 排除 %s", exclText))
+    else
+        SetStatus(L["Astral: starting"] or "开始… 请靠近 NPC")
+    end
     if panel and panel.startBtn then
         panel.startBtn:SetText(L["Astral: Stop"] or "停止")
     end
@@ -914,6 +1033,20 @@ addon:RegisterFeature(KEY, {
                 local cfg = Cfg()
                 if cfg then
                     cfg.itemFilter = val or ""
+                end
+            end,
+        })
+        C:AddEditBox(_, {
+            label = L["Astral attr exclude"],
+            desc = L["Astral attr exclude desc"],
+            getFunc = function()
+                local cfg = Cfg()
+                return cfg and cfg.attrExclude or ""
+            end,
+            setFunc = function(val)
+                local cfg = Cfg()
+                if cfg then
+                    cfg.attrExclude = val or ""
                 end
             end,
         })
