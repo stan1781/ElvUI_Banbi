@@ -79,7 +79,10 @@ local knownSkills = {} -- canonical → true
 local sessionFired = {} -- canonical → true
 local pendingFire = {} -- canonical → true (delay reserved)
 local dragonHooked = false
-local ready = false -- true after first PEW snapshot
+-- Login skill lines often load late; do not treat the first populate as "newly learned".
+local baselined = false
+local baselineToken = 0
+local BASELINE_DELAY = 1.5
 
 local function Cfg()
     return addon:GetFeatureConfig(KEY)
@@ -193,21 +196,13 @@ local function FireLearn(canonical, delayed)
     end
 end
 
-local function SnapshotSkills(fireNew)
-    local found = ScanProfessionSkills()
-
-    if fireNew and ready then
-        local cfg = Cfg()
-        if not cfg or cfg.onLearn ~= false then
-            for canon in pairs(found) do
-                if not knownSkills[canon] then
-                    FireLearn(canon, true)
-                end
-            end
-        end
+local function MergeKnown(found)
+    for canon in pairs(found) do
+        knownSkills[canon] = true
     end
+end
 
-    -- Drop abandoned professions so re-learn can fire again
+local function ReplaceKnown(found)
     for canon in pairs(knownSkills) do
         if not found[canon] then
             knownSkills[canon] = nil
@@ -218,6 +213,45 @@ local function SnapshotSkills(fireNew)
     for canon in pairs(found) do
         knownSkills[canon] = true
     end
+end
+
+-- fireNew: only after baseline; detects abandon→relearn (skill absent then present again).
+local function SnapshotSkills(fireNew)
+    local found = ScanProfessionSkills()
+
+    if not baselined then
+        -- While skills are still loading, only accumulate — never send.
+        MergeKnown(found)
+        return
+    end
+
+    if fireNew then
+        local cfg = Cfg()
+        if not cfg or cfg.onLearn ~= false then
+            for canon in pairs(found) do
+                if not knownSkills[canon] then
+                    FireLearn(canon, true)
+                end
+            end
+        end
+    end
+
+    ReplaceKnown(found)
+end
+
+local function BeginBaseline()
+    baselined = false
+    baselineToken = baselineToken + 1
+    local token = baselineToken
+    MergeKnown(ScanProfessionSkills())
+    After(BASELINE_DELAY, function()
+        if not active or token ~= baselineToken then
+            return
+        end
+        -- Final snapshot of whatever is loaded; still no commands.
+        ReplaceKnown(ScanProfessionSkills())
+        baselined = true
+    end)
 end
 
 local function TryOpenRefill()
@@ -273,19 +307,27 @@ local function OnEvent(_, event)
         return
     end
     if event == "PLAYER_ENTERING_WORLD" then
-        SnapshotSkills(false)
-        ready = true
+        if not baselined then
+            BeginBaseline()
+        else
+            -- Zoning after baseline: refresh list only, never auto-send.
+            SnapshotSkills(false)
+        end
         TryHookDragonUI()
         return
     end
     if event == "SKILL_LINES_CHANGED" then
-        if not ready then
+        if not baselined then
+            MergeKnown(ScanProfessionSkills())
             return
         end
         SnapshotSkills(true)
         return
     end
     if event == "TRADE_SKILL_SHOW" then
+        if not baselined then
+            return
+        end
         TryOpenRefill()
         return
     end
@@ -312,7 +354,8 @@ end
 
 local function OnEnable()
     active = true
-    ready = false
+    baselined = false
+    baselineToken = baselineToken + 1
     knownSkills = {}
     sessionFired = {}
     pendingFire = {}
@@ -320,14 +363,14 @@ local function OnEnable()
     f:RegisterEvent("PLAYER_ENTERING_WORLD")
     f:RegisterEvent("SKILL_LINES_CHANGED")
     f:RegisterEvent("TRADE_SKILL_SHOW")
-    SnapshotSkills(false)
-    ready = true
+    BeginBaseline()
     TryHookDragonUI()
 end
 
 local function OnDisable()
     active = false
-    ready = false
+    baselined = false
+    baselineToken = baselineToken + 1
     if eventFrame then
         eventFrame:UnregisterAllEvents()
     end
