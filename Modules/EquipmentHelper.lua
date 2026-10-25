@@ -105,7 +105,7 @@ local function DefaultCharDB()
         autoSwitchOnTalent = true,
         pvpSet = nil,
         autoSwitchOnPvP = true,
-        challengeSet = nil,
+        challengeSets = {},
         autoSwitchOnChallenge = true,
         challengeMinLevel = DEFAULT_CHALLENGE_MIN_LEVEL,
     }
@@ -128,6 +128,9 @@ local function GetCharEquipmentDB()
         root.chars[key] = charDB
     end
     charDB.talentSets = charDB.talentSets or {}
+    charDB.challengeSets = charDB.challengeSets or {}
+    -- Drop legacy single-slot challenge binding; user rebinds per talent.
+    charDB.challengeSet = nil
     if charDB.autoSwitchOnTalent == nil then charDB.autoSwitchOnTalent = true end
     if charDB.autoSwitchOnPvP == nil then charDB.autoSwitchOnPvP = true end
     if charDB.autoSwitchOnChallenge == nil then charDB.autoSwitchOnChallenge = true end
@@ -136,11 +139,11 @@ local function GetCharEquipmentDB()
     if _tempCharDB then
         local temp = _tempCharDB
         for k, v in pairs(temp.talentSets or {}) do charDB.talentSets[k] = v end
+        for k, v in pairs(temp.challengeSets or {}) do charDB.challengeSets[k] = v end
         if temp.activeSetName then charDB.activeSetName = temp.activeSetName end
         if temp.autoSwitchOnTalent ~= nil then charDB.autoSwitchOnTalent = temp.autoSwitchOnTalent end
         if temp.pvpSet then charDB.pvpSet = temp.pvpSet end
         if temp.autoSwitchOnPvP ~= nil then charDB.autoSwitchOnPvP = temp.autoSwitchOnPvP end
-        if temp.challengeSet then charDB.challengeSet = temp.challengeSet end
         if temp.autoSwitchOnChallenge ~= nil then charDB.autoSwitchOnChallenge = temp.autoSwitchOnChallenge end
         if temp.challengeMinLevel ~= nil then charDB.challengeMinLevel = temp.challengeMinLevel end
         _tempCharDB = nil
@@ -448,29 +451,40 @@ function EH:ShowTalentBindingMenu(button)
     table.insert(menu, { text = " " })
 
     local minLv = charDB.challengeMinLevel or DEFAULT_CHALLENGE_MIN_LEVEL
-    if charDB.challengeSet == button.name then
+    local challengeBound
+    for tg, sn in pairs(charDB.challengeSets) do
+        if sn == button.name then
+            challengeBound = true
+            table.insert(menu, {
+                text = string.format(L["Bound as challenge set (≥%d) talent %d"], minLv, tg),
+                notCheckable = true, isTitle = true,
+            })
+        end
+    end
+    for tg = 1, 2 do
         table.insert(menu, {
-            text = string.format(L["Bound as challenge set (≥%d)"], minLv),
-            notCheckable = true, isTitle = true,
+            text = string.format(L["Bind as challenge set (≥%d) talent %d"], minLv, tg),
+            notCheckable = true,
+            func = function()
+                local db = GetCharEquipmentDB()
+                db.challengeSets = db.challengeSets or {}
+                db.challengeSets[tg] = button.name
+                db.challengeMinLevel = db.challengeMinLevel or DEFAULT_CHALLENGE_MIN_LEVEL
+                print("|cff00ff00" .. string.format(L["Challenge bound talent %d:"], tg) .. "|r " .. button.name)
+                EH:UpdateButtons()
+            end,
         })
+    end
+    if challengeBound then
         table.insert(menu, {
             text = L["Unbind challenge"],
             notCheckable = true,
             func = function()
-                GetCharEquipmentDB().challengeSet = nil
-                print("|cff00ff00" .. L["Challenge unbound:"] .. "|r " .. button.name)
-                EH:UpdateButtons()
-            end,
-        })
-    else
-        table.insert(menu, {
-            text = string.format(L["Bind as challenge set (≥%d)"], minLv),
-            notCheckable = true,
-            func = function()
                 local db = GetCharEquipmentDB()
-                db.challengeSet = button.name
-                db.challengeMinLevel = db.challengeMinLevel or DEFAULT_CHALLENGE_MIN_LEVEL
-                print("|cff00ff00" .. L["Challenge bound:"] .. "|r " .. button.name)
+                for tg, sn in pairs(db.challengeSets) do
+                    if sn == button.name then db.challengeSets[tg] = nil end
+                end
+                print("|cff00ff00" .. L["Challenge unbound:"] .. "|r " .. button.name)
                 EH:UpdateButtons()
             end,
         })
@@ -568,9 +582,11 @@ local function CreateEquipmentButton(parent, index)
             if charDB.pvpSet == self.name then
                 GameTooltip:AddLine(L["Bound as PvP set"], 1, 0.4, 0.4)
             end
-            if charDB.challengeSet == self.name then
-                local minLv = charDB.challengeMinLevel or DEFAULT_CHALLENGE_MIN_LEVEL
-                GameTooltip:AddLine(string.format(L["Bound as challenge set (≥%d)"], minLv), 0.6, 0.8, 1)
+            local minLv = charDB.challengeMinLevel or DEFAULT_CHALLENGE_MIN_LEVEL
+            for tg, sn in pairs(charDB.challengeSets) do
+                if sn == self.name then
+                    GameTooltip:AddLine(string.format(L["Bound as challenge set (≥%d) talent %d"], minLv, tg), 0.6, 0.8, 1)
+                end
             end
             if EH:IsEquipmentSetEquipped(self.setID) then
                 GameTooltip:AddLine(L["Currently equipped"], 1, 1, 0)
@@ -622,17 +638,27 @@ function EH:UpdateButtons()
         for talentGroup, setName in pairs(charDB.talentSets) do
             if setName == name then boundTalent = talentGroup break end
         end
+        local challengeGroups = {}
+        for tg, setName in pairs(charDB.challengeSets) do
+            if setName == name then
+                challengeGroups[#challengeGroups + 1] = tg
+            end
+        end
         if boundTalent then
             btn.badge:SetText(boundTalent)
             btn.badge:SetTextColor(1, 0.82, 0)
             btn.badge:Show()
+        elseif #challengeGroups > 0 then
+            if #challengeGroups >= 2 then
+                btn.badge:SetText("C")
+            else
+                btn.badge:SetText("C" .. challengeGroups[1])
+            end
+            btn.badge:SetTextColor(0.6, 0.8, 1)
+            btn.badge:Show()
         elseif charDB.pvpSet == name then
             btn.badge:SetText("P")
             btn.badge:SetTextColor(1, 0.4, 0.4)
-            btn.badge:Show()
-        elseif charDB.challengeSet == name then
-            btn.badge:SetText("C")
-            btn.badge:SetTextColor(0.6, 0.8, 1)
             btn.badge:Show()
         else
             btn.badge:Hide()
@@ -726,9 +752,15 @@ function EH:GetChallengeLevel()
     return nil, true
 end
 
+function EH:ResolveChallengeEquipSet()
+    local charDB = GetCharEquipmentDB()
+    local tg = GetActiveTalentGroup and GetActiveTalentGroup() or 1
+    return charDB.challengeSets[tg] or charDB.talentSets[tg]
+end
+
 function EH:ShouldUseChallengeSet()
     local charDB = GetCharEquipmentDB()
-    if not charDB.challengeSet or not charDB.autoSwitchOnChallenge then return false end
+    if not charDB.autoSwitchOnChallenge then return false end
     local level = self:GetChallengeLevel()
     if not level then return false end
     return level >= (charDB.challengeMinLevel or DEFAULT_CHALLENGE_MIN_LEVEL)
@@ -753,28 +785,24 @@ function EH:OnChallengeChanged()
         inChallengeMode = self:ShouldUseChallengeSet()
         return
     end
-    local challengeSet = charDB.challengeSet
-    if not challengeSet then
-        inChallengeMode = false
-        return
-    end
     if self:IsInPvPZone() and charDB.pvpSet then
         inChallengeMode = false
         return
     end
     local nowInChallenge = self:ShouldUseChallengeSet()
+    local targetSet = self:ResolveChallengeEquipSet()
     if nowInChallenge and not inChallengeMode then
         inChallengeMode = true
-        if charDB.activeSetName ~= challengeSet then
+        if targetSet and charDB.activeSetName ~= targetSet then
             charDB.preChallengeSetName = charDB.activeSetName
-            self:EquipTalentSet(challengeSet, string.format(L["Challenge %d auto-equip"], level or 0))
+            self:EquipTalentSet(targetSet, string.format(L["Challenge %d auto-equip"], level or 0))
         end
     elseif not nowInChallenge and inChallengeMode then
         inChallengeMode = false
         local activeTalentGroup = GetActiveTalentGroup and GetActiveTalentGroup() or 1
         local restoreSet = charDB.talentSets[activeTalentGroup] or charDB.preChallengeSetName
         charDB.preChallengeSetName = nil
-        if restoreSet and restoreSet ~= challengeSet and charDB.activeSetName ~= restoreSet then
+        if restoreSet and charDB.activeSetName ~= restoreSet then
             self:EquipTalentSet(restoreSet, L["Leave challenge equip"])
         end
     else
@@ -803,10 +831,11 @@ function EH:OnZoneChanged()
         end
     elseif not nowInPvP and inPvPZone then
         inPvPZone = false
-        if self:ShouldUseChallengeSet() and charDB.challengeSet then
+        if self:ShouldUseChallengeSet() then
             inChallengeMode = true
-            if charDB.activeSetName ~= charDB.challengeSet then
-                self:EquipTalentSet(charDB.challengeSet, L["Challenge auto-equip"])
+            local challengeTarget = self:ResolveChallengeEquipSet()
+            if challengeTarget and charDB.activeSetName ~= challengeTarget then
+                self:EquipTalentSet(challengeTarget, L["Challenge auto-equip"])
             end
             charDB.prePvPSetName = nil
             return
@@ -826,9 +855,15 @@ function EH:OnTalentChanged()
     local charDB = GetCharEquipmentDB()
     if not charDB.autoSwitchOnTalent then return end
     if self:IsInPvPZone() and charDB.pvpSet then return end
-    if self:ShouldUseChallengeSet() and charDB.challengeSet then return end
     local activeTalentGroup = GetActiveTalentGroup()
-    local targetSetName = charDB.talentSets[activeTalentGroup]
+    local targetSetName
+    local reason
+    if self:ShouldUseChallengeSet() then
+        targetSetName = self:ResolveChallengeEquipSet()
+        reason = L["Challenge auto-equip"]
+    else
+        targetSetName = charDB.talentSets[activeTalentGroup]
+    end
     if not targetSetName then return end
     for id = 1, GetNumEquipmentSets() do
         if GetEquipmentSetInfo(id) == targetSetName then
@@ -842,7 +877,7 @@ function EH:OnTalentChanged()
         pendingTalentSwitch = targetSetName
         print("|cff00ff00" .. L["Will switch after combat:"] .. "|r " .. targetSetName)
     else
-        self:EquipTalentSet(targetSetName)
+        self:EquipTalentSet(targetSetName, reason)
     end
 end
 
