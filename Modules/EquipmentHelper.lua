@@ -45,6 +45,9 @@ local isDragging = false
 local setItemIDCache = {}
 local pendingTalentSwitch
 local pendingRetrySetName
+-- Suppress talent auto-equip right after a meta-toggle equip (the rune pulse swaps
+-- the rune -> PLAYER_TALENT_UPDATE, which would otherwise clobber the toggle set).
+local metaEquipGuardUntil = 0
 local retryCount, maxRetries = 0, 3
 local retryTimer
 local inPvPZone, inChallengeMode = false, false
@@ -101,8 +104,10 @@ end
 local function DefaultCharDB()
     return {
         talentSets = {},
+        metaSets = {},
         activeSetName = nil,
         autoSwitchOnTalent = true,
+        autoSwitchOnMeta = true,
         pvpSet = nil,
         autoSwitchOnPvP = true,
         challengeSets = {},
@@ -128,10 +133,12 @@ local function GetCharEquipmentDB()
         root.chars[key] = charDB
     end
     charDB.talentSets = charDB.talentSets or {}
+    charDB.metaSets = charDB.metaSets or {}
     charDB.challengeSets = charDB.challengeSets or {}
     -- Drop legacy single-slot challenge binding; user rebinds per talent.
     charDB.challengeSet = nil
     if charDB.autoSwitchOnTalent == nil then charDB.autoSwitchOnTalent = true end
+    if charDB.autoSwitchOnMeta == nil then charDB.autoSwitchOnMeta = true end
     if charDB.autoSwitchOnPvP == nil then charDB.autoSwitchOnPvP = true end
     if charDB.autoSwitchOnChallenge == nil then charDB.autoSwitchOnChallenge = true end
     if charDB.challengeMinLevel == nil then charDB.challengeMinLevel = DEFAULT_CHALLENGE_MIN_LEVEL end
@@ -139,9 +146,11 @@ local function GetCharEquipmentDB()
     if _tempCharDB then
         local temp = _tempCharDB
         for k, v in pairs(temp.talentSets or {}) do charDB.talentSets[k] = v end
+        for k, v in pairs(temp.metaSets or {}) do charDB.metaSets[k] = v end
         for k, v in pairs(temp.challengeSets or {}) do charDB.challengeSets[k] = v end
         if temp.activeSetName then charDB.activeSetName = temp.activeSetName end
         if temp.autoSwitchOnTalent ~= nil then charDB.autoSwitchOnTalent = temp.autoSwitchOnTalent end
+        if temp.autoSwitchOnMeta ~= nil then charDB.autoSwitchOnMeta = temp.autoSwitchOnMeta end
         if temp.pvpSet then charDB.pvpSet = temp.pvpSet end
         if temp.autoSwitchOnPvP ~= nil then charDB.autoSwitchOnPvP = temp.autoSwitchOnPvP end
         if temp.autoSwitchOnChallenge ~= nil then charDB.autoSwitchOnChallenge = temp.autoSwitchOnChallenge end
@@ -426,6 +435,48 @@ function EH:ShowTalentBindingMenu(button)
     end
     table.insert(menu, { text = " " })
 
+    -- bbRotHelper warlock toggle bindings (恶魔变形 / 暗影箭雨).
+    local metaBindings = {
+        { key = "meta", label = L["Bind as Metamorphosis set"],
+          bound = L["Bound as Metamorphosis set"], unbind = L["Unbind Metamorphosis"],
+          done = L["Metamorphosis bound:"], undone = L["Metamorphosis unbound:"] },
+        { key = "rain", label = L["Bind as Shadow Bolt Rain set"],
+          bound = L["Bound as Shadow Bolt Rain set"], unbind = L["Unbind Shadow Bolt Rain"],
+          done = L["Shadow Bolt Rain bound:"], undone = L["Shadow Bolt Rain unbound:"] },
+    }
+    for _, binding in ipairs(metaBindings) do
+        if charDB.metaSets[binding.key] == button.name then
+            table.insert(menu, { text = binding.bound, notCheckable = true, isTitle = true })
+            table.insert(menu, {
+                text = binding.unbind,
+                notCheckable = true,
+                func = function()
+                    local db = GetCharEquipmentDB()
+                    for k, sn in pairs(db.metaSets) do
+                        if sn == button.name then db.metaSets[k] = nil end
+                    end
+                    print("|cff00ff00" .. binding.undone .. "|r " .. button.name)
+                    EH:UpdateButtons()
+                end,
+            })
+        else
+            table.insert(menu, {
+                text = binding.label,
+                notCheckable = true,
+                func = function()
+                    local db = GetCharEquipmentDB()
+                    for k, sn in pairs(db.metaSets) do
+                        if sn == button.name then db.metaSets[k] = nil end
+                    end
+                    db.metaSets[binding.key] = button.name
+                    print("|cff00ff00" .. binding.done .. "|r " .. button.name)
+                    EH:UpdateButtons()
+                end,
+            })
+        end
+    end
+    table.insert(menu, { text = " " })
+
     if charDB.pvpSet == button.name then
         table.insert(menu, { text = L["Bound as PvP set"], notCheckable = true, isTitle = true })
         table.insert(menu, {
@@ -582,6 +633,14 @@ local function CreateEquipmentButton(parent, index)
             if charDB.pvpSet == self.name then
                 GameTooltip:AddLine(L["Bound as PvP set"], 1, 0.4, 0.4)
             end
+            if charDB.metaSets then
+                if charDB.metaSets.meta == self.name then
+                    GameTooltip:AddLine(L["Bound as Metamorphosis set"], 0.5, 1, 0.5)
+                end
+                if charDB.metaSets.rain == self.name then
+                    GameTooltip:AddLine(L["Bound as Shadow Bolt Rain set"], 0.5, 1, 0.5)
+                end
+            end
             local minLv = charDB.challengeMinLevel or DEFAULT_CHALLENGE_MIN_LEVEL
             for tg, sn in pairs(charDB.challengeSets) do
                 if sn == self.name then
@@ -638,6 +697,11 @@ function EH:UpdateButtons()
         for talentGroup, setName in pairs(charDB.talentSets) do
             if setName == name then boundTalent = talentGroup break end
         end
+        local metaTag
+        if charDB.metaSets then
+            if charDB.metaSets.meta == name then metaTag = "M"
+            elseif charDB.metaSets.rain == name then metaTag = "R" end
+        end
         local challengeGroups = {}
         for tg, setName in pairs(charDB.challengeSets) do
             if setName == name then
@@ -647,6 +711,10 @@ function EH:UpdateButtons()
         if boundTalent then
             btn.badge:SetText(boundTalent)
             btn.badge:SetTextColor(1, 0.82, 0)
+            btn.badge:Show()
+        elseif metaTag then
+            btn.badge:SetText(metaTag)
+            btn.badge:SetTextColor(0.5, 1, 0.5)
             btn.badge:Show()
         elseif #challengeGroups > 0 then
             if #challengeGroups >= 2 then
@@ -854,6 +922,7 @@ end
 function EH:OnTalentChanged()
     local charDB = GetCharEquipmentDB()
     if not charDB.autoSwitchOnTalent then return end
+    if GetTime() < metaEquipGuardUntil then return end
     if self:IsInPvPZone() and charDB.pvpSet then return end
     local activeTalentGroup = GetActiveTalentGroup()
     local targetSetName
@@ -879,6 +948,49 @@ function EH:OnTalentChanged()
     else
         self:EquipTalentSet(targetSetName, reason)
     end
+end
+
+-- bbRotHelper warlock "恶魔变形" toggle: ON -> meta set, OFF -> 暗影箭雨 set.
+-- In combat EquipTalentSet queues the swap until combat ends (engine cannot swap gear in combat).
+function EH:OnWarlockMetaToggle(enabled)
+    local charDB = GetCharEquipmentDB()
+    if charDB.autoSwitchOnMeta == false then return end
+    if self:IsInPvPZone() and charDB.pvpSet then return end
+    if self:ShouldUseChallengeSet() then return end
+    local setName = charDB.metaSets[enabled and "meta" or "rain"]
+    if not setName then return end
+
+    local targetSetID
+    for id = 1, GetNumEquipmentSets() do
+        if GetEquipmentSetInfo(id) == setName then
+            targetSetID = id
+            break
+        end
+    end
+    if not targetSetID then return end
+    if self:IsEquipmentSetFullyEquipped(targetSetID) then
+        return
+    end
+    self:EquipTalentSet(setName, enabled and L["Metamorphosis auto-equip"] or L["Shadow Bolt Rain auto-equip"])
+    metaEquipGuardUntil = GetTime() + 3
+end
+
+local toggleListenerCancel
+local function RegisterRotationToggleListener()
+    if toggleListenerCancel then return true end
+    local bb = _G.bbRotHelperAddon
+    local rot = bb and bb.Rotation
+    if not (rot and rot.RegisterToggleListener) then return false end
+    toggleListenerCancel = rot:RegisterToggleListener("rotationUseMeta", function(on)
+        if active then EH:OnWarlockMetaToggle(on) end
+    end)
+    return true
+end
+
+local function UnregisterRotationToggleListener()
+    if not toggleListenerCancel then return end
+    toggleListenerCancel()
+    toggleListenerCancel = nil
 end
 
 local function OnEvent(_, event, ...)
@@ -915,6 +1027,9 @@ local function OnEvent(_, event, ...)
             EH:EquipTalentSet(pendingTalentSwitch)
             pendingTalentSwitch = nil
         end
+    elseif event == "PLAYER_LOGIN" then
+        -- bbRotHelper may load after this addon; retry the toggle listener hook.
+        RegisterRotationToggleListener()
     elseif event == "PLAYER_EQUIPMENT_CHANGED" or event == "EQUIPMENT_SETS_CHANGED" then
         EH:UpdateButtons()
     end
@@ -934,6 +1049,7 @@ local function RegisterEvents()
     eventFrame:RegisterEvent("EQUIPMENT_SWAP_FINISHED")
     eventFrame:RegisterEvent("PLAYER_TALENT_UPDATE")
     eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    eventFrame:RegisterEvent("PLAYER_LOGIN")
     eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     eventFrame:RegisterEvent("UNIT_AURA")
     eventFrame:RegisterEvent("UPDATE_WORLD_STATES")
@@ -992,6 +1108,7 @@ local function OnEnable()
             EH:UpdateButtons()
             EH:OnZoneChanged()
             EH:OnChallengeChanged()
+            RegisterRotationToggleListener()
         end
     end)
     EH:DetectLoginActiveSet()
@@ -1003,6 +1120,7 @@ local function OnDisable()
     active = false
     CancelRetry()
     pendingTalentSwitch = nil
+    UnregisterRotationToggleListener()
     UnregisterEvents()
     if mainFrame then mainFrame:Hide() end
 end
@@ -1035,6 +1153,11 @@ addon:RegisterFeature(KEY, {
                 GetCharEquipmentDB().autoSwitchOnChallenge = val and true or false
                 if active then EH:OnChallengeChanged() end
             end,
+        })
+        C:AddToggle(section, {
+            label = L["Auto-switch on warlock meta toggle"],
+            getFunc = function() return GetCharEquipmentDB().autoSwitchOnMeta ~= false end,
+            setFunc = function(val) GetCharEquipmentDB().autoSwitchOnMeta = val and true or false end,
         })
         C:AddSlider(section, {
             label = L["Challenge min level"],
