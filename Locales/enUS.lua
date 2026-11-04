@@ -62,6 +62,11 @@ L["Restore rune skills on the action bar after gear swaps."] = true
 L["Channel shorten, quick chat bar, timestamps, Tab channel cycle, edit history, and /banbiroll."] = "Channel shorten, timestamp, Tab switch, edit history, and quick chat bar."
 -- 装备助手：私服客户端常为 enUS，此处直接给中文，强制中文显示。
 L["Equipment Helper"] = "装备管理助手"
+L["Bag Corruption"] = "背包装备腐蚀"
+L["Show item corruption (+N) on bag and bank icons."] = "在背包/银行装备图标右上角显示腐蚀数值（+N）。"
+L["Shows +N in the top-right of ElvUI bag/bank equipment icons when the tooltip has「+N 腐蚀」."] =
+    "当物品提示含「+N 腐蚀」时，在 ElvUI 背包/银行图标右上角显示 +N。"
+L["0 = follow ElvUI bag item level font size."] = "0 = 跟随 ElvUI 背包装等字号。"
 L["Quick talent/PvP/challenge equipment set switching."] = "天赋/PvP/挑战配装快速切换。"
 L["Equipment set shortcut bar with talent/PvP/challenge auto-switch. Shift+drag to move."] = "装备方案快捷条，支持天赋/PvP/挑战自动换装。Shift+拖动移动位置。"
 L["Right-click a set button to bind talent/PvP/challenge. Shift+drag moves the bar."] = "右键方案按钮可绑定天赋/PvP/挑战；Shift+拖动移动按钮条。"

@@ -265,6 +265,7 @@ local function BuildOptions()
                 "inspectPanel",
                 "itemInfo", -- 未进 TOC 时 GetFeature 为 nil，分区自动跳过
                 "equipmentHelper",
+                "bagCorruption",
             }, false),
             combat = BuildTabFromFeatures(L["Combat"] or "Combat", 4, {
                 "runeBar",

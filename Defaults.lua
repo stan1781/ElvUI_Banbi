@@ -64,6 +64,10 @@ addon.defaults = {
                 posY = -180,
                 scale = 1,
             },
+            bagCorruption = {
+                enabled = true,
+                fontSize = 0, -- 0 = follow ElvUI bags itemLevel font size
+            },
             friendSync = {
                 enabled = true,
             },

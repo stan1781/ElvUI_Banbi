@@ -40,4 +40,5 @@ Modules\Inspect\InspectGemEnchant.lua
 Modules\Inspect\InspectPanel.lua
 Modules\RuneBar.lua
 Modules\EquipmentHelper.lua
+Modules\BagCorruption.lua
 Modules\AstralEnhance.lua
