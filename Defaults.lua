@@ -20,12 +20,12 @@ addon.defaults = {
                 posY = -8,
                 tokens = {
                     [65085] = true, -- 虚空碎片
-                    [65297] = true, -- 觉醒泰坦精华
+                    [65297] = false, -- 觉醒泰坦精华
                     [69885] = true, -- 灵魂灰烬
                     [60038] = true, -- 次级好运护符
                     [60039] = true, -- 长老的好运符
-                    [70539] = true, -- 商贩标币
-                    [70877] = true, -- 求知护符
+                    [70539] = false, -- 商贩标币
+                    [70877] = false, -- 求知护符
                 },
                 showCorruption = true,
                 showPower = true,
