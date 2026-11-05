@@ -12,8 +12,9 @@ addon.defaults = {
                 posX = 0,
                 posY = 120,
             },
-            tokenBar = {
+            infoBar = {
                 enabled = true,
+                fontSize = 12,
                 anchor = "TOPLEFT",
                 posX = 20,
                 posY = -8,
@@ -26,13 +27,6 @@ addon.defaults = {
                     [70539] = true, -- 商贩标币
                     [70877] = true, -- 求知护符
                 },
-            },
-            statBar = {
-                enabled = true,
-                fontSize = 12,
-                anchor = "TOPLEFT",
-                posX = 20,
-                posY = -40,
                 showCorruption = true,
                 showPower = true,
                 showCrit = true,

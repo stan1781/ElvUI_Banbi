@@ -1,13 +1,14 @@
-﻿-- ElvUI_Banbi — movable stat bar (corruption overflow, AP/SP, crit, haste).
+﻿-- ElvUI_Banbi — stat text content for Info Bar (right side).
 
 local ADDON_NAME, addon = ...
 local L = addon.L
 
-local KEY = "statBar"
+local CFG_KEY = "infoBar"
 local DYNAMIC_CORRUPTION_SPELL = 94005
 local CORRUPTION_PATTERN = "%+(%d+)%s*腐蚀"
 local RESIST_PATTERN = "%+(%d+)%s*腐蚀抗性"
 local UPDATE_INTERVAL = 0.2
+local TEXT_PAD = 8
 
 local format = string.format
 local match = string.match
@@ -16,15 +17,17 @@ local tonumber = tonumber
 local floor = math.floor
 
 local active = false
-local frame
+local host
+local textFS
+local eventFrame
 local scanTip
 local gearCorruption, resistCorruption, dynamicCorruption = 0, 0, 0
-local powerKind = "melee" -- melee | ranged | spell
+local powerKind = "melee"
 local updateElapsed = 0
 local lastText
+local contentWidth = 0
 
 local INV_SLOTS = {
-    -- include shirt(4) and tabard(19): private-server resist/corruption often live there
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
 }
 
@@ -41,15 +44,20 @@ local CLASS_FALLBACK = {
     DRUID = "melee",
 }
 
--- Dual-spec classes: tab index → kind (1/2/3).
 local CLASS_TAB_KIND = {
-    DRUID = { "spell", "melee", "spell" }, -- Balance, Feral, Resto
-    SHAMAN = { "spell", "melee", "spell" }, -- Elemental, Enhance, Resto
-    PALADIN = { "spell", "melee", "melee" }, -- Holy, Prot, Ret
+    DRUID = { "spell", "melee", "spell" },
+    SHAMAN = { "spell", "melee", "spell" },
+    PALADIN = { "spell", "melee", "melee" },
 }
 
 local function Cfg()
-    return addon:GetFeatureConfig(KEY)
+    return addon:GetFeatureConfig(CFG_KEY)
+end
+
+local function NotifyRelayout()
+    if addon.InfoBar and addon.InfoBar.Relayout then
+        addon.InfoBar.Relayout()
+    end
 end
 
 local function StripColors(text)
@@ -303,81 +311,6 @@ local function ReadDynamicCorruption()
     end
 end
 
-local function NormTex()
-    local E = addon:GetE()
-    if E and E.media and E.media.normTex then
-        return E.media.normTex
-    end
-    return "Interface\\Buttons\\WHITE8X8"
-end
-
-local function PersistPosition()
-    if not frame then
-        return
-    end
-    local cfg = Cfg()
-    if not cfg then
-        return
-    end
-    local left, top = frame:GetLeft(), frame:GetTop()
-    if not left or not top then
-        return
-    end
-    local pLeft, pTop = UIParent:GetLeft() or 0, UIParent:GetTop() or 0
-    cfg.anchor = "TOPLEFT"
-    cfg.posX = left - pLeft
-    cfg.posY = top - pTop
-end
-
-local function ApplyPosition()
-    if not frame then
-        return
-    end
-    local cfg = Cfg()
-    frame:ClearAllPoints()
-    frame:SetPoint(
-        "TOPLEFT",
-        UIParent,
-        "TOPLEFT",
-        (cfg and cfg.posX) or 20,
-        (cfg and cfg.posY) or -40
-    )
-end
-
-local function ApplyChrome()
-    if not frame then
-        return
-    end
-    local tex = NormTex()
-    frame:SetBackdrop({
-        bgFile = tex,
-        edgeFile = tex,
-        tile = true,
-        tileSize = 8,
-        edgeSize = 1,
-        insets = { left = 2, right = 2, top = 2, bottom = 2 },
-    })
-    frame:SetBackdropColor(0, 0, 0, 0.55)
-    frame:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.8)
-end
-
-local function ApplyFont()
-    if not frame or not frame.text then
-        return
-    end
-    local cfg = Cfg()
-    local size = (cfg and cfg.fontSize) or 12
-    if size < 8 then
-        size = 8
-    end
-    if size > 24 then
-        size = 24
-    end
-    local E = addon:GetE()
-    local font = (E and E.media and E.media.normFont) or STANDARD_TEXT_FONT
-    frame.text:SetFont(font, size, "OUTLINE")
-end
-
 local function RefreshPowerKind()
     local cfg = Cfg()
     powerKind = ResolvePowerKind(cfg and cfg.powerMode or "auto")
@@ -406,10 +339,12 @@ local function BuildText()
 end
 
 local function RefreshText(force)
-    if not frame or not active then
-        if frame then
-            frame:Hide()
+    if not textFS or not active then
+        contentWidth = 0
+        if host then
+            host:Hide()
         end
+        NotifyRelayout()
         return
     end
     local text = BuildText()
@@ -417,10 +352,16 @@ local function RefreshText(force)
         return
     end
     lastText = text
-    frame.text:SetText(text)
-    local w = (frame.text:GetStringWidth() or 40) + 16
-    frame:SetWidth(math.max(w, 40))
-    frame:Show()
+    textFS:SetText(text)
+    if text == "" then
+        contentWidth = 0
+        host:Hide()
+    else
+        contentWidth = (textFS:GetStringWidth() or 0) + TEXT_PAD
+        host:SetWidth(math.max(contentWidth, 1))
+        host:Show()
+    end
+    NotifyRelayout()
 end
 
 local function FullCorruptionRefresh()
@@ -429,35 +370,42 @@ local function FullCorruptionRefresh()
     RefreshText(true)
 end
 
-local function EnsureFrame()
-    if frame then
-        return frame
+local function OnEvent(_, event, unit)
+    if event == "UNIT_AURA" and unit ~= "player" then
+        return
     end
-    frame = CreateFrame("Frame", "ElvUI_Banbi_StatBar", UIParent)
-    frame:SetFrameStrata("MEDIUM")
-    frame:SetFrameLevel(50)
-    frame:SetHeight(24)
-    frame:EnableMouse(true)
-    frame:SetMovable(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", function(self)
-        if InCombatLockdown and InCombatLockdown() then
-            return
-        end
-        self:StartMoving()
-    end)
-    frame:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        PersistPosition()
-    end)
-    frame.text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    frame.text:SetPoint("LEFT", frame, "LEFT", 8, 0)
-    frame.text:SetJustifyH("LEFT")
-    ApplyChrome()
-    ApplyPosition()
-    ApplyFont()
-    frame:SetScript("OnUpdate", function(self, elapsed)
+    if event == "UNIT_INVENTORY_CHANGED" and unit and unit ~= "player" then
+        return
+    end
+    if event == "PLAYER_TALENT_UPDATE" or event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_LOGIN" then
+        RefreshPowerKind()
+    end
+    if event == "UNIT_AURA"
+        or event == "UNIT_INVENTORY_CHANGED"
+        or event == "PLAYER_EQUIPMENT_CHANGED"
+        or event == "PLAYER_ENTERING_WORLD"
+        or event == "PLAYER_LOGIN"
+    then
+        FullCorruptionRefresh()
+    else
+        RefreshText(true)
+    end
+end
+
+local function Attach(parent)
+    if host then
+        host:SetParent(parent)
+        return host
+    end
+    host = CreateFrame("Frame", "ElvUI_Banbi_InfoBarStats", parent)
+    host:SetHeight(24)
+    host:EnableMouse(false)
+    textFS = host:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    textFS:SetPoint("LEFT", host, "LEFT", 0, 0)
+    textFS:SetJustifyH("LEFT")
+    eventFrame = CreateFrame("Frame", nil, host)
+    eventFrame:SetScript("OnEvent", OnEvent)
+    eventFrame:SetScript("OnUpdate", function(_, elapsed)
         if not active then
             return
         end
@@ -468,188 +416,159 @@ local function EnsureFrame()
         updateElapsed = 0
         RefreshText(false)
     end)
-    frame:SetScript("OnEvent", function(self, event, unit)
-        if event == "UNIT_AURA" and unit ~= "player" then
-            return
-        end
-        if event == "UNIT_INVENTORY_CHANGED" and unit and unit ~= "player" then
-            return
-        end
-        if event == "PLAYER_TALENT_UPDATE" or event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_LOGIN" then
-            RefreshPowerKind()
-        end
-        if event == "UNIT_AURA"
-            or event == "UNIT_INVENTORY_CHANGED"
-            or event == "PLAYER_EQUIPMENT_CHANGED"
-            or event == "PLAYER_ENTERING_WORLD"
-            or event == "PLAYER_LOGIN"
-        then
-            FullCorruptionRefresh()
-        else
-            RefreshText(true)
-        end
-    end)
-    return frame
+    return host
 end
 
-local function OnEnable()
-    active = true
-    EnsureFrame()
-    ApplyChrome()
-    ApplyPosition()
-    ApplyFont()
-    RefreshPowerKind()
-    frame:RegisterEvent("PLAYER_LOGIN")
-    frame:RegisterEvent("PLAYER_ENTERING_WORLD")
-    frame:RegisterEvent("UNIT_INVENTORY_CHANGED")
-    frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-    frame:RegisterEvent("UNIT_AURA")
-    frame:RegisterEvent("PLAYER_TALENT_UPDATE")
-    frame:RegisterEvent("COMBAT_RATING_UPDATE")
-    frame:RegisterEvent("UNIT_STATS")
-    frame:RegisterEvent("UNIT_ATTACK_POWER")
-    frame:RegisterEvent("UNIT_RANGED_ATTACK_POWER")
-    FullCorruptionRefresh()
-end
-
-local function OnDisable()
-    active = false
-    lastText = nil
-    if frame then
-        frame:UnregisterAllEvents()
-        frame:Hide()
+local function ApplyFont(font, size)
+    if textFS then
+        textFS:SetFont(font, size, "OUTLINE")
+    end
+    if active then
+        RefreshText(true)
     end
 end
 
-addon:RegisterFeature(KEY, {
-    category = "general",
-    default = true,
-    label = function()
-        return L["Stat Bar"]
-    end,
-    desc = function()
-        return L["Show corruption overflow, attack/spell power, crit, and haste on a movable bar."]
-    end,
-    OnEnable = OnEnable,
-    OnDisable = OnDisable,
+local function Enable()
+    active = true
+    if not eventFrame then
+        return
+    end
+    RefreshPowerKind()
+    eventFrame:RegisterEvent("PLAYER_LOGIN")
+    eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    eventFrame:RegisterEvent("UNIT_INVENTORY_CHANGED")
+    eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+    eventFrame:RegisterEvent("UNIT_AURA")
+    eventFrame:RegisterEvent("PLAYER_TALENT_UPDATE")
+    eventFrame:RegisterEvent("COMBAT_RATING_UPDATE")
+    eventFrame:RegisterEvent("UNIT_STATS")
+    eventFrame:RegisterEvent("UNIT_ATTACK_POWER")
+    eventFrame:RegisterEvent("UNIT_RANGED_ATTACK_POWER")
+    FullCorruptionRefresh()
+end
+
+local function Disable()
+    active = false
+    lastText = nil
+    contentWidth = 0
+    if eventFrame then
+        eventFrame:UnregisterAllEvents()
+    end
+    if host then
+        host:Hide()
+    end
+    NotifyRelayout()
+end
+
+local function BuildOptions(section, C)
+    C:AddToggle(section, {
+        label = L["Show Corruption Overflow"],
+        getFunc = function()
+            local cfg = Cfg()
+            return not cfg or cfg.showCorruption ~= false
+        end,
+        setFunc = function(val)
+            local cfg = Cfg()
+            if cfg then
+                cfg.showCorruption = val and true or false
+            end
+            if active then
+                RefreshText(true)
+            end
+        end,
+    })
+    C:AddToggle(section, {
+        label = L["Show Power"],
+        getFunc = function()
+            local cfg = Cfg()
+            return not cfg or cfg.showPower ~= false
+        end,
+        setFunc = function(val)
+            local cfg = Cfg()
+            if cfg then
+                cfg.showPower = val and true or false
+            end
+            if active then
+                RefreshText(true)
+            end
+        end,
+    })
+    C:AddToggle(section, {
+        label = L["Show Crit"],
+        getFunc = function()
+            local cfg = Cfg()
+            return not cfg or cfg.showCrit ~= false
+        end,
+        setFunc = function(val)
+            local cfg = Cfg()
+            if cfg then
+                cfg.showCrit = val and true or false
+            end
+            if active then
+                RefreshText(true)
+            end
+        end,
+    })
+    C:AddToggle(section, {
+        label = L["Show Haste"],
+        getFunc = function()
+            local cfg = Cfg()
+            return not cfg or cfg.showHaste ~= false
+        end,
+        setFunc = function(val)
+            local cfg = Cfg()
+            if cfg then
+                cfg.showHaste = val and true or false
+            end
+            if active then
+                RefreshText(true)
+            end
+        end,
+    })
+    C:AddSelect(section, {
+        label = L["Power Display"],
+        values = {
+            auto = L["Auto (talents)"] or "Auto",
+            melee = L["Melee AP"] or "Melee AP",
+            ranged = L["Ranged AP"] or "Ranged AP",
+            spell = L["Spell Power"] or "Spell Power",
+        },
+        getFunc = function()
+            local cfg = Cfg()
+            return (cfg and cfg.powerMode) or "auto"
+        end,
+        setFunc = function(val)
+            local cfg = Cfg()
+            if cfg then
+                cfg.powerMode = val
+            end
+            if active then
+                RefreshPowerKind()
+                RefreshText(true)
+            end
+        end,
+    })
+end
+
+addon.InfoBarStats = {
+    Attach = Attach,
+    Enable = Enable,
+    Disable = Disable,
     Refresh = function()
-        if not active then
-            return
+        if active then
+            RefreshPowerKind()
+            FullCorruptionRefresh()
         end
-        ApplyChrome()
-        ApplyPosition()
-        ApplyFont()
-        RefreshPowerKind()
-        FullCorruptionRefresh()
     end,
-    BuildOptions = function(section, C)
-        C:AddDescription(section, L["Drag the bar to move it."] or "Drag the bar to move it.")
-        C:AddSlider(section, {
-            label = L["Font Size"],
-            min = 8,
-            max = 24,
-            step = 1,
-            getFunc = function()
-                local cfg = Cfg()
-                return (cfg and cfg.fontSize) or 12
-            end,
-            setFunc = function(val)
-                local cfg = Cfg()
-                if cfg then
-                    cfg.fontSize = val
-                end
-                if active then
-                    ApplyFont()
-                    RefreshText(true)
-                end
-            end,
-        })
-        C:AddToggle(section, {
-            label = L["Show Corruption Overflow"],
-            getFunc = function()
-                local cfg = Cfg()
-                return not cfg or cfg.showCorruption ~= false
-            end,
-            setFunc = function(val)
-                local cfg = Cfg()
-                if cfg then
-                    cfg.showCorruption = val and true or false
-                end
-                if active then
-                    RefreshText(true)
-                end
-            end,
-        })
-        C:AddToggle(section, {
-            label = L["Show Power"],
-            getFunc = function()
-                local cfg = Cfg()
-                return not cfg or cfg.showPower ~= false
-            end,
-            setFunc = function(val)
-                local cfg = Cfg()
-                if cfg then
-                    cfg.showPower = val and true or false
-                end
-                if active then
-                    RefreshText(true)
-                end
-            end,
-        })
-        C:AddToggle(section, {
-            label = L["Show Crit"],
-            getFunc = function()
-                local cfg = Cfg()
-                return not cfg or cfg.showCrit ~= false
-            end,
-            setFunc = function(val)
-                local cfg = Cfg()
-                if cfg then
-                    cfg.showCrit = val and true or false
-                end
-                if active then
-                    RefreshText(true)
-                end
-            end,
-        })
-        C:AddToggle(section, {
-            label = L["Show Haste"],
-            getFunc = function()
-                local cfg = Cfg()
-                return not cfg or cfg.showHaste ~= false
-            end,
-            setFunc = function(val)
-                local cfg = Cfg()
-                if cfg then
-                    cfg.showHaste = val and true or false
-                end
-                if active then
-                    RefreshText(true)
-                end
-            end,
-        })
-        C:AddSelect(section, {
-            label = L["Power Display"],
-            values = {
-                auto = L["Auto (talents)"] or "Auto",
-                melee = L["Melee AP"] or "Melee AP",
-                ranged = L["Ranged AP"] or "Ranged AP",
-                spell = L["Spell Power"] or "Spell Power",
-            },
-            getFunc = function()
-                local cfg = Cfg()
-                return (cfg and cfg.powerMode) or "auto"
-            end,
-            setFunc = function(val)
-                local cfg = Cfg()
-                if cfg then
-                    cfg.powerMode = val
-                end
-                if active then
-                    RefreshPowerKind()
-                    RefreshText(true)
-                end
-            end,
-        })
+    ApplyFont = ApplyFont,
+    BuildOptions = BuildOptions,
+    GetContentWidth = function()
+        return contentWidth or 0
     end,
-})
+    HasContent = function()
+        return (contentWidth or 0) > 0
+    end,
+    GetHost = function()
+        return host
+    end,
+}

@@ -1,6 +1,6 @@
 ## Interface: 30300
 ## Title: |cff1784d1E|r|cffe5e3e3lvUI|r |cff1784d1Banbi|r
-## Notes: ElvUI 增强：移速、代币条、聊天栏、装备列表、符文条、装备助手、好友同步（替代 bbTools/TinyInspect/FriendsMenuXP/MotionSpeed/ChatBar TokenBar）
+## Notes: ElvUI 增强：移速、信息栏、聊天栏、装备列表、符文条、装备助手、好友同步（替代 bbTools/TinyInspect/FriendsMenuXP/MotionSpeed/ChatBar TokenBar）
 ## Title-zhCN: |cff1784d1E|r|cffe5e3e3lvUI|r |cff1784d1斑比增强|r
 ## Author: 斑比
 ## Version: 1.0.0
@@ -24,6 +24,7 @@ Modules\AutoTrack.lua
 Modules\AutoLearnRecipes.lua
 Modules\TokenBar.lua
 Modules\StatBar.lua
+Modules\InfoBar.lua
 Modules\ChatEmote.lua
 Modules\ChatBar.lua
 Modules\ChatEnhance.lua

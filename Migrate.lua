@@ -52,14 +52,56 @@ function addon:Migrate()
         end
     end
 
-    -- BagSyncTokenBarDB
+    -- BagSyncTokenBarDB → infoBar
     if not Mark("tokenBar") then
         local old = _G.BagSyncTokenBarDB
         if type(old) == "table" then
-            local cfg = addon:GetFeatureConfig("tokenBar")
+            local cfg = addon:GetFeatureConfig("infoBar")
             if cfg and old.enabled ~= nil then
                 cfg.enabled = old.enabled and true or false
             end
+        end
+    end
+
+    -- Merge legacy tokenBar + statBar into infoBar (one-shot)
+    if not Mark("infoBarMerge") then
+        local feats = addon.db.profile.features
+        if type(feats) == "table" then
+            local oldToken = feats.tokenBar
+            local oldStat = feats.statBar
+            local cfg = addon:GetFeatureConfig("infoBar")
+            if cfg and (type(oldToken) == "table" or type(oldStat) == "table") then
+                local tOn = type(oldToken) == "table" and oldToken.enabled ~= false
+                local sOn = type(oldStat) == "table" and oldStat.enabled ~= false
+                if type(oldToken) == "table" or type(oldStat) == "table" then
+                    cfg.enabled = (tOn or sOn) and true or false
+                end
+                if type(oldStat) == "table" then
+                    if oldStat.fontSize ~= nil then cfg.fontSize = oldStat.fontSize end
+                    if oldStat.showCorruption ~= nil then cfg.showCorruption = oldStat.showCorruption and true or false end
+                    if oldStat.showPower ~= nil then cfg.showPower = oldStat.showPower and true or false end
+                    if oldStat.showCrit ~= nil then cfg.showCrit = oldStat.showCrit and true or false end
+                    if oldStat.showHaste ~= nil then cfg.showHaste = oldStat.showHaste and true or false end
+                    if oldStat.powerMode ~= nil then cfg.powerMode = oldStat.powerMode end
+                    if oldStat.posX ~= nil then cfg.posX = oldStat.posX end
+                    if oldStat.posY ~= nil then cfg.posY = oldStat.posY end
+                    if oldStat.anchor ~= nil then cfg.anchor = oldStat.anchor end
+                end
+                if type(oldToken) == "table" then
+                    if type(oldToken.tokens) == "table" then
+                        cfg.tokens = cfg.tokens or {}
+                        CopyTable(oldToken.tokens, cfg.tokens)
+                    end
+                    -- Prefer stat position when present; else token
+                    if type(oldStat) ~= "table" or oldStat.posX == nil then
+                        if oldToken.posX ~= nil then cfg.posX = oldToken.posX end
+                        if oldToken.posY ~= nil then cfg.posY = oldToken.posY end
+                        if oldToken.anchor ~= nil then cfg.anchor = oldToken.anchor end
+                    end
+                end
+            end
+            feats.tokenBar = nil
+            feats.statBar = nil
         end
     end
 

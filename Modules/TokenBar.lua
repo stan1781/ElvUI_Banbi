@@ -1,13 +1,12 @@
--- ElvUI_Banbi — top token bar (from BagSync_TokenBar / Enhanced infoBar tokens).
+-- ElvUI_Banbi — token counts content for Info Bar (left side).
 
 local ADDON_NAME, addon = ...
 local L = addon.L
 
-local KEY = "tokenBar"
+local CFG_KEY = "infoBar"
 local ICON_SIZE = 20
 local GAP = 10
 local PAD_X = 6
-local PAD_Y = 4
 
 local WATCHED_TOKENS = {
     { id = 65085, name = "虚空碎片" },
@@ -22,12 +21,14 @@ local WATCHED_TOKENS = {
 local SILVER = "|cffc7c7cf%s|r"
 local MOSS = "|cFF80FF00%s|r"
 
-local frame
+local host
 local buttons = {}
 local active = false
+local contentWidth = 0
+local fontPath, fontSize
 
 local function Cfg()
-    return addon:GetFeatureConfig(KEY)
+    return addon:GetFeatureConfig(CFG_KEY)
 end
 
 local function IsTokenShown(id)
@@ -43,57 +44,6 @@ local function EnsureTokensTable()
         cfg.tokens = {}
     end
     return cfg.tokens
-end
-
-local function NormTex()
-    local E = addon:GetE()
-    if E and E.media and E.media.normTex then
-        return E.media.normTex
-    end
-    return "Interface\\Buttons\\WHITE8X8"
-end
-
-local function PersistPosition()
-    if not frame then return end
-    local cfg = Cfg()
-    if not cfg then return end
-    -- 相对屏幕，避免拖完后锚点落在临时父级上
-    local left = frame:GetLeft()
-    local top = frame:GetTop()
-    if not left or not top then return end
-    local parent = UIParent
-    local pLeft, pTop = parent:GetLeft() or 0, parent:GetTop() or 0
-    cfg.anchor = "TOPLEFT"
-    cfg.posX = left - pLeft
-    cfg.posY = top - pTop
-end
-
-local function ApplyPosition()
-    if not frame then return end
-    local cfg = Cfg()
-    frame:ClearAllPoints()
-    frame:SetPoint(
-        "TOPLEFT",
-        UIParent,
-        "TOPLEFT",
-        (cfg and cfg.posX) or 20,
-        (cfg and cfg.posY) or -8
-    )
-end
-
-local function ApplyChrome()
-    if not frame then return end
-    local tex = NormTex()
-    frame:SetBackdrop({
-        bgFile = tex,
-        edgeFile = tex,
-        tile = true,
-        tileSize = 8,
-        edgeSize = 1,
-        insets = { left = 2, right = 2, top = 2, bottom = 2 },
-    })
-    frame:SetBackdropColor(0, 0, 0, 0.55)
-    frame:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.8)
 end
 
 local function GetTokenData(itemID)
@@ -157,17 +107,21 @@ local function OnLeave()
 end
 
 local function StartDrag()
-    if not frame or not frame:IsMovable() then return end
-    if InCombatLockdown and InCombatLockdown() then return end
-    frame.isMoving = true
-    frame:StartMoving()
+    if addon.InfoBar and addon.InfoBar.StartDrag then
+        addon.InfoBar.StartDrag()
+    end
 end
 
 local function StopDrag()
-    if not frame or not frame.isMoving then return end
-    frame.isMoving = nil
-    frame:StopMovingOrSizing()
-    PersistPosition()
+    if addon.InfoBar and addon.InfoBar.StopDrag then
+        addon.InfoBar.StopDrag()
+    end
+end
+
+local function NotifyRelayout()
+    if addon.InfoBar and addon.InfoBar.Relayout then
+        addon.InfoBar.Relayout()
+    end
 end
 
 local function CreateButton(parent)
@@ -176,7 +130,6 @@ local function CreateButton(parent)
     btn:EnableMouse(true)
     btn:SetScript("OnEnter", OnEnter)
     btn:SetScript("OnLeave", OnLeave)
-    -- 子按钮占满热区，需把拖动转给父栏（与 BagSync_TokenBar 一致）
     btn:SetScript("OnMouseDown", function()
         StartDrag()
     end)
@@ -195,21 +148,28 @@ local function CreateButton(parent)
     countText:SetPoint("LEFT", icon, "RIGHT", 3, 0)
     countText:SetJustifyH("LEFT")
     countText:SetText("0")
+    if fontPath and fontSize then
+        countText:SetFont(fontPath, fontSize, "OUTLINE")
+    end
     btn.countText = countText
     return btn
 end
 
 local function Refresh()
-    if not frame or not active then
-        if frame then frame:Hide() end
+    if not host or not active then
+        contentWidth = 0
+        if host then
+            host:Hide()
+        end
+        NotifyRelayout()
         return
     end
-    local x = PAD_X
+    local x = 0
     local anyShown = false
     for i, info in ipairs(WATCHED_TOKENS) do
         local btn = buttons[i]
         if not btn then
-            btn = CreateButton(frame)
+            btn = CreateButton(host)
             buttons[i] = btn
         end
         if not IsTokenShown(info.id) then
@@ -224,103 +184,113 @@ local function Refresh()
             local textWidth = btn.countText:GetStringWidth() or 20
             btn:SetWidth(ICON_SIZE + 3 + textWidth)
             btn:ClearAllPoints()
-            btn:SetPoint("LEFT", frame, "LEFT", x, 0)
+            btn:SetPoint("LEFT", host, "LEFT", x, 0)
             btn:Show()
             x = x + btn:GetWidth() + GAP
             anyShown = true
         end
     end
     if anyShown then
-        frame:SetWidth(math.max(x - GAP + PAD_X, 40))
+        contentWidth = math.max(x - GAP, 0)
+        host:SetWidth(contentWidth)
+        host:Show()
     else
-        frame:SetWidth(40)
+        contentWidth = 0
+        host:SetWidth(1)
+        host:Hide()
     end
-    frame:Show()
+    NotifyRelayout()
 end
 
-local function EnsureFrame()
-    if frame then return frame end
-    frame = CreateFrame("Frame", "ElvUI_Banbi_TokenBar", UIParent)
-    frame:SetFrameStrata("MEDIUM")
-    frame:SetFrameLevel(50)
-    frame:SetHeight(ICON_SIZE + PAD_Y * 2)
-    frame:EnableMouse(true)
-    frame:SetMovable(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnMouseDown", function(self, button)
-        if button == "LeftButton" then
-            StartDrag()
+local function ApplyFont(font, size)
+    fontPath, fontSize = font, size
+    for i = 1, #buttons do
+        local btn = buttons[i]
+        if btn and btn.countText then
+            btn.countText:SetFont(font, size, "OUTLINE")
         end
-    end)
-    frame:SetScript("OnMouseUp", function(self, button)
-        if button == "LeftButton" then
-            StopDrag()
-        end
-    end)
-    frame:SetScript("OnDragStart", StartDrag)
-    frame:SetScript("OnDragStop", StopDrag)
-    ApplyChrome()
-    ApplyPosition()
+    end
+    if active then
+        Refresh()
+    end
+end
 
-    frame:SetScript("OnEvent", function(self, event)
+local function Attach(parent)
+    if host then
+        host:SetParent(parent)
+        host:ClearAllPoints()
+        host:SetPoint("LEFT", parent, "LEFT", PAD_X, 0)
+        return host
+    end
+    host = CreateFrame("Frame", "ElvUI_Banbi_InfoBarTokens", parent)
+    host:SetHeight(ICON_SIZE)
+    host:SetPoint("LEFT", parent, "LEFT", PAD_X, 0)
+    host:EnableMouse(false)
+    host:SetScript("OnEvent", function(_, event)
         if event == "PLAYER_ENTERING_WORLD" or event == "BAG_UPDATE" or event == "PLAYER_LOGIN" then
             Refresh()
         end
     end)
-    return frame
+    return host
 end
 
-local function OnEnable()
+local function Enable()
     active = true
-    EnsureFrame()
-    ApplyChrome()
-    ApplyPosition()
-    frame:RegisterEvent("PLAYER_LOGIN")
-    frame:RegisterEvent("PLAYER_ENTERING_WORLD")
-    frame:RegisterEvent("BAG_UPDATE")
+    if not host then return end
+    host:RegisterEvent("PLAYER_LOGIN")
+    host:RegisterEvent("PLAYER_ENTERING_WORLD")
+    host:RegisterEvent("BAG_UPDATE")
     Refresh()
 end
 
-local function OnDisable()
+local function Disable()
     active = false
-    if frame then
-        frame:UnregisterAllEvents()
-        frame:Hide()
+    contentWidth = 0
+    if host then
+        host:UnregisterAllEvents()
+        host:Hide()
+    end
+    NotifyRelayout()
+end
+
+local function BuildOptions(section, C)
+    for _, info in ipairs(WATCHED_TOKENS) do
+        local id = info.id
+        C:AddToggle(section, {
+            label = L[info.name] or info.name,
+            getFunc = function()
+                return IsTokenShown(id)
+            end,
+            setFunc = function(val)
+                local tokens = EnsureTokensTable()
+                if tokens then
+                    tokens[id] = val and true or false
+                end
+                if active then
+                    Refresh()
+                end
+            end,
+        })
     end
 end
 
-addon:RegisterFeature(KEY, {
-    category = "general",
-    default = true,
-    label = function() return L["Token Bar"] end,
-    desc = function() return L["Show watched currency/token counts at the top of the screen."] end,
-    OnEnable = OnEnable,
-    OnDisable = OnDisable,
-    BuildOptions = function(section, C)
-        C:AddDescription(section, L["Drag the bar to move it."] or "Drag the bar to move it.")
-        for _, info in ipairs(WATCHED_TOKENS) do
-            local id = info.id
-            C:AddToggle(section, {
-                label = L[info.name] or info.name,
-                getFunc = function()
-                    return IsTokenShown(id)
-                end,
-                setFunc = function(val)
-                    local tokens = EnsureTokensTable()
-                    if tokens then
-                        tokens[id] = val and true or false
-                    end
-                    Refresh()
-                end,
-            })
-        end
+addon.InfoBarTokens = {
+    Attach = Attach,
+    Enable = Enable,
+    Disable = Disable,
+    Refresh = Refresh,
+    ApplyFont = ApplyFont,
+    BuildOptions = BuildOptions,
+    GetContentWidth = function()
+        return contentWidth or 0
     end,
-    Refresh = function()
-        if active then
-            ApplyChrome()
-            ApplyPosition()
-            Refresh()
-        end
+    HasContent = function()
+        return (contentWidth or 0) > 0
     end,
-})
+    GetIconSize = function()
+        return ICON_SIZE
+    end,
+    GetPadX = function()
+        return PAD_X
+    end,
+}
