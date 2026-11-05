@@ -27,6 +27,18 @@ addon.defaults = {
                     [70877] = true, -- 求知护符
                 },
             },
+            statBar = {
+                enabled = true,
+                fontSize = 12,
+                anchor = "TOPLEFT",
+                posX = 20,
+                posY = -40,
+                showCorruption = true,
+                showPower = true,
+                showCrit = true,
+                showHaste = true,
+                powerMode = "auto", -- auto | melee | ranged | spell
+            },
             chatEnhance = {
                 enabled = true,
                 -- ElvUI Chat 自带精简时间戳；Banbi 不再叠一层 HH:MM:SS

@@ -78,6 +78,30 @@ local function NewOptionBuilder(args, startOrder)
         args[key] = entry
     end
 
+
+    function C:AddSelect(section, opt)
+        local key = nextKey("select")
+        local entry = {
+            type = "select",
+            name = opt.label or key,
+            desc = opt.desc,
+            order = order,
+            values = opt.values or {},
+            get = function()
+                return opt.getFunc and opt.getFunc() or nil
+            end,
+            set = function(_, value)
+                if opt.setFunc then
+                    opt.setFunc(value)
+                end
+            end,
+        }
+        if opt.disabled then
+            entry.disabled = opt.disabled
+        end
+        args[key] = entry
+    end
+
     function C:AddEditBox(section, opt)
         local key = nextKey("input")
         local entry = {
@@ -256,6 +280,7 @@ local function BuildOptions()
             general = BuildTabFromFeatures(L["General"] or "General", 1, {
                 "motionSpeed",
                 "tokenBar",
+                "statBar",
                 "autoLearnRecipes",
             }, true),
             chat = BuildTabFromFeatures(L["Chat"] or "Chat", 2, {

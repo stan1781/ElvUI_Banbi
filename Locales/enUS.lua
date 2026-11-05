@@ -256,3 +256,21 @@ L["AutoLearn: clear session"] = "Clear session sent list"
 L["AutoLearn: clear session desc"] = "Allow auto-send again for the same profession this login."
 L["AutoLearn: fired %s"] = "Auto-learned recipes: %s"
 L["AutoLearn: session cleared"] = "Cleared this session's auto-learn record"
+
+L["Stat Bar"] = true
+L["Show corruption overflow, attack/spell power, crit, and haste on a movable bar."] = true
+L["Corruption Overflow"] = true
+L["Show Corruption Overflow"] = true
+L["Show Power"] = true
+L["Show Crit"] = true
+L["Show Haste"] = true
+L["Power Display"] = true
+L["Auto (talents)"] = true
+L["Melee AP"] = true
+L["Ranged AP"] = true
+L["Spell Power"] = true
+L["Attack Power"] = true
+L["Ranged Attack Power"] = true
+L["Crit"] = true
+L["Haste"] = true
+
