@@ -4,7 +4,32 @@ local ADDON_NAME, addon = ...
 local L = addon.L
 
 local CFG_KEY = "infoBar"
-local DYNAMIC_CORRUPTION_SPELL = 94005
+-- From update.MPQ Spell.dbc:
+-- 94005 恩佐斯的低语 = visible "+腐蚀" amount aura (94003/94004 hidden tickers trigger it).
+-- 94002 腐化 = challenge marker only (no amount) — do NOT treat as score.
+-- Threshold effects below expose the running overflow in their tooltips as net rises.
+local TRACKER_SPELL_IDS = {
+    [94005] = true, -- 恩佐斯的低语
+}
+local EFFECT_SPELL_IDS = {
+    [92633] = true, -- 贪婪触须 (low overflow)
+    [92861] = true, [92862] = true, [92863] = true, [92864] = true, -- 腐化之眼
+    [92635] = true, -- 在劫难逃
+    [92870] = true, -- 倾泻灾祸
+    [92865] = true, -- 壮美幻象
+    [92636] = true, [92637] = true, -- 末路恶果 (higher overflow)
+}
+local TRACKER_NAMES = {
+    ["恩佐斯的低语"] = true,
+}
+local EFFECT_NAMES = {
+    ["贪婪触须"] = true,
+    ["腐化之眼"] = true,
+    ["在劫难逃"] = true,
+    ["倾泻灾祸"] = true,
+    ["壮美幻象"] = true,
+    ["末路恶果"] = true,
+}
 local CORRUPTION_PATTERN = "%+(%d+)%s*腐蚀"
 local RESIST_PATTERN = "%+(%d+)%s*腐蚀抗性"
 local UPDATE_INTERVAL = 0.2
@@ -266,49 +291,120 @@ local function RescanGearCorruption()
     gearCorruption, resistCorruption = g, r
 end
 
-local function DynamicSpellName()
-    if GetSpellInfo then
-        return GetSpellInfo(DYNAMIC_CORRUPTION_SPELL)
+local function EnsureTrackerNames()
+    if not GetSpellInfo then
+        return
     end
-    return nil
+    for id in pairs(TRACKER_SPELL_IDS) do
+        local n = GetSpellInfo(id)
+        if n and n ~= "" then
+            TRACKER_NAMES[n] = true
+        end
+    end
+    for id in pairs(EFFECT_SPELL_IDS) do
+        local n = GetSpellInfo(id)
+        if n and n ~= "" then
+            EFFECT_NAMES[n] = true
+        end
+    end
 end
 
-local function ReadDynamicCorruption()
-    dynamicCorruption = 0
-    local wantName = DynamicSpellName()
+-- 94005 tip is "腐蚀值提高$s1点"; stack count also rises with ticks.
+local function ParseAuraCorruptionAmount(index, filter, stackCount)
+    local tip = EnsureScanTip()
+    tip:ClearLines()
+    tip:SetOwner(UIParent, "ANCHOR_NONE")
+    tip:SetUnitAura("player", index, filter)
+    local tipAmount = 0
+    local num = tip:NumLines() or 0
+    for li = 2, num do
+        local line = _G["ElvUI_Banbi_StatBarTipTextLeft" .. li]
+        local text = line and StripColors(line:GetText() or "") or ""
+        if text ~= "" then
+            local n = match(text, "腐蚀值提高%s*(%d+)")
+            if not n and match(text, "腐蚀") and not match(text, "腐蚀抗性") then
+                n = match(text, "(%d+)")
+            end
+            if n then
+                local v = tonumber(n) or 0
+                if v > tipAmount then
+                    tipAmount = v
+                end
+            end
+        end
+    end
+    tip:Hide()
+    local stacks = tonumber(stackCount) or 0
+    if tipAmount > stacks then
+        return tipAmount
+    end
+    return stacks
+end
+
+local function IsTrackerAura(name, spellId)
+    if spellId and TRACKER_SPELL_IDS[spellId] then
+        return true
+    end
+    if name and TRACKER_NAMES[name] then
+        return true
+    end
+    return false
+end
+
+local function IsEffectAura(name, spellId)
+    if spellId and EFFECT_SPELL_IDS[spellId] then
+        return true
+    end
+    if name and EFFECT_NAMES[name] then
+        return true
+    end
+    return false
+end
+
+-- Scan one filter. Only amounts > 0 count (Lua treats 0 as truthy).
+local function ScanDynamicCorruptionFilter(filter)
+    local bestTracker, bestEffect
     local i = 1
     while true do
-        local name, _, _, count = UnitAura("player", i, "HELPFUL")
+        local name, _, _, count, _, _, _, _, _, _, spellId = UnitAura("player", i, filter)
         if not name then
             break
         end
-        local isTarget = wantName and name == wantName
-        if isTarget then
-            local amount = tonumber(count) or 0
-            if amount == 0 then
-                local tip = EnsureScanTip()
-                tip:ClearLines()
-                tip:SetOwner(UIParent, "ANCHOR_NONE")
-                tip:SetUnitAura("player", i, "HELPFUL")
-                local num = tip:NumLines() or 0
-                for li = 2, num do
-                    local line = _G["ElvUI_Banbi_StatBarTipTextLeft" .. li]
-                    local text = line and StripColors(line:GetText() or "") or ""
-                    if match(text, "腐蚀") then
-                        local n = match(text, "(%d+)")
-                        if n then
-                            amount = tonumber(n) or 0
-                            break
-                        end
-                    end
-                end
-                tip:Hide()
+        if IsTrackerAura(name, spellId) then
+            local amount = ParseAuraCorruptionAmount(i, filter, count)
+            if amount > 0 and (not bestTracker or amount > bestTracker) then
+                bestTracker = amount
             end
-            dynamicCorruption = amount
-            break
+        elseif IsEffectAura(name, spellId) then
+            local amount = ParseAuraCorruptionAmount(i, filter, count)
+            if amount > 0 and (not bestEffect or amount > bestEffect) then
+                bestEffect = amount
+            end
         end
         i = i + 1
     end
+    return bestTracker, bestEffect
+end
+
+local function ReadDynamicCorruption()
+    EnsureTrackerNames()
+    -- Debuffs first; buffs as fallback.
+    local t1, e1 = ScanDynamicCorruptionFilter("HARMFUL")
+    local t2, e2 = ScanDynamicCorruptionFilter("HELPFUL")
+    local best = 0
+    if t1 and t1 > best then
+        best = t1
+    end
+    if t2 and t2 > best then
+        best = t2
+    end
+    if e1 and e1 > best then
+        best = e1
+    end
+    if e2 and e2 > best then
+        best = e2
+    end
+    dynamicCorruption = best
 end
 
 local function RefreshPowerKind()
@@ -414,6 +510,8 @@ local function Attach(parent)
             return
         end
         updateElapsed = 0
+        -- Value can tick up without a reliable UNIT_AURA; re-read aura each interval.
+        ReadDynamicCorruption()
         RefreshText(false)
     end)
     return host
