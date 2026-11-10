@@ -645,13 +645,17 @@ function EH:UpdateButtons()
             displayName = string.sub(name, 1, 8) .. ".."
         end
         btn.text:SetText(displayName)
-        if self:IsEquipmentSetEquipped(i) then
-            btn.text:SetTextColor(1, 1, 0)
-            btn.icon:SetVertexColor(1, 0.82, 0)
-        else
+        local isActiveSet = self:IsEquipmentSetEquipped(i)
+        if btn.icon then
             btn.icon:SetVertexColor(1, 1, 1)
+        end
+        if isActiveSet then
+            btn.text:SetTextColor(1, 1, 0)
+        else
             btn.text:SetTextColor(1, 1, 1)
         end
+        addon:SetPixelGlow(btn, isActiveSet, "BanbiEquip")
+        addon:SetActiveGlowBorder(btn, isActiveSet)
         btn.name = name
         btn.setID = i
 
@@ -687,7 +691,11 @@ function EH:UpdateButtons()
         end
     end
     for i = buttonCount + 1, #buttons do
-        if buttons[i] then buttons[i]:Hide() end
+        if buttons[i] then
+            addon:SetPixelGlow(buttons[i], false, "BanbiEquip")
+            addon:SetActiveGlowBorder(buttons[i], false)
+            buttons[i]:Hide()
+        end
     end
 end
 
@@ -1026,6 +1034,14 @@ local function OnDisable()
     CancelRetry()
     pendingTalentSwitch = nil
     UnregisterEvents()
+    if buttons then
+        for i = 1, #buttons do
+            if buttons[i] then
+                addon:SetPixelGlow(buttons[i], false, "BanbiEquip")
+                addon:SetActiveGlowBorder(buttons[i], false)
+            end
+        end
+    end
     if mainFrame then mainFrame:Hide() end
 end
 

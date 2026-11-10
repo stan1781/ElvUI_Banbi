@@ -21,6 +21,7 @@ Options.lua
 Modules\ClientCompat.lua
 Modules\MotionSpeed.lua
 Modules\AutoTrack.lua
+Modules\PixelGlow.lua
 Modules\AspectBar.lua
 Modules\AutoLearnRecipes.lua
 Modules\TokenBar.lua

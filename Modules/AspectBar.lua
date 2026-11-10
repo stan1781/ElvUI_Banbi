@@ -501,131 +501,15 @@ local function OnLeave()
 end
 
 -- ---------------------------------------------------------------------------
--- 金色点点沿边框跑动（类似 WA Autocast Glow），不盖住图标
--- 优先 LibCustomGlow.AutoCastGlow；否则内置小方点实现
+-- 金色点点沿边框跑动：共用实现见 Modules/PixelGlow.lua
 -- ---------------------------------------------------------------------------
 
-local GLOW_COLOR = { 1, 0.82, 0.2, 1 }
-local GLOW_DOTS = 8          -- 每圈点数
-local GLOW_GROUPS = 2        -- 几组错开的点轨
-local GLOW_DOT_SIZE = 3      -- 点的边长（像素）
-local GLOW_FREQ = 0.45
-local LCG = LibStub and LibStub("LibCustomGlow-1.0", true)
-
-local function DotGlowOnSizeChanged(self)
-    local w, h = self:GetWidth(), self:GetHeight()
-    if w <= 0 or h <= 0 then
-        return
-    end
-    local info = self.info
-    info.width = w
-    info.height = h
-    info.perimeter = 2 * (w + h)
-    info.bottomlim = h * 2 + w
-    info.rightlim = h + w
-    info.space = info.perimeter / info.N
-end
-
-local function DotGlowOnUpdate(self, elapsed)
-    local info = self.info
-    if not info.width then
-        DotGlowOnSizeChanged(self)
-        if not info.width then
-            return
-        end
-    end
-    local texIndex = 0
-    local size = info.dotSize
-    for g = 1, info.groups do
-        self.timer[g] = self.timer[g] + elapsed / (info.period * g)
-        if self.timer[g] > 1 or self.timer[g] < -1 then
-            self.timer[g] = self.timer[g] % 1
-        end
-        for i = 1, info.N do
-            texIndex = texIndex + 1
-            local tex = self.textures[texIndex]
-            local position = (info.space * i + info.perimeter * self.timer[g]) % info.perimeter
-            tex:SetWidth(size)
-            tex:SetHeight(size)
-            tex:ClearAllPoints()
-            if position > info.bottomlim then
-                tex:SetPoint("CENTER", self, "BOTTOMRIGHT", -position + info.bottomlim, 0)
-            elseif position > info.rightlim then
-                tex:SetPoint("CENTER", self, "TOPRIGHT", 0, -position + info.rightlim)
-            elseif position > info.height then
-                tex:SetPoint("CENTER", self, "TOPLEFT", position - info.height, 0)
-            else
-                tex:SetPoint("CENTER", self, "BOTTOMLEFT", 0, position)
-            end
-        end
-    end
+local function StartPixelGlow(btn)
+    addon:StartPixelGlow(btn, "BanbiAspect")
 end
 
 local function StopPixelGlow(btn)
-    if not btn then
-        return
-    end
-    if LCG then
-        if LCG.AutoCastGlow_Stop then
-            LCG.AutoCastGlow_Stop(btn, "BanbiAspect")
-        end
-        if LCG.PixelGlow_Stop then
-            LCG.PixelGlow_Stop(btn, "BanbiAspect")
-        end
-    end
-    if btn._banbiPixelGlow then
-        btn._banbiPixelGlow:Hide()
-        btn._banbiPixelGlow:SetScript("OnUpdate", nil)
-    end
-    btn._banbiGlowOn = false
-end
-
-local function StartPixelGlow(btn)
-    if not btn then
-        return
-    end
-    -- WA：Autocast 就是沿边跑的金色/彩色小点
-    if LCG and LCG.AutoCastGlow_Start then
-        LCG.AutoCastGlow_Start(btn, GLOW_COLOR, GLOW_DOTS, GLOW_FREQ, 1.1, 0, 0, "BanbiAspect")
-        btn._banbiGlowOn = true
-        return
-    end
-    local f = btn._banbiPixelGlow
-    local total = GLOW_DOTS * GLOW_GROUPS
-    if not f then
-        f = CreateFrame("Frame", nil, btn)
-        f:SetAllPoints(btn)
-        f:SetFrameLevel((btn:GetFrameLevel() or 0) + 8)
-        f.textures = {}
-        f.info = {
-            N = GLOW_DOTS,
-            groups = GLOW_GROUPS,
-            period = 1 / GLOW_FREQ,
-            dotSize = GLOW_DOT_SIZE,
-        }
-        f.timer = {}
-        for g = 1, GLOW_GROUPS do
-            f.timer[g] = (g - 1) / GLOW_GROUPS
-        end
-        for i = 1, total do
-            local tex = f:CreateTexture(nil, "OVERLAY")
-            tex:SetTexture(WHITE)
-            tex:SetVertexColor(GLOW_COLOR[1], GLOW_COLOR[2], GLOW_COLOR[3], GLOW_COLOR[4])
-            tex:SetBlendMode("ADD")
-            tex:SetWidth(GLOW_DOT_SIZE)
-            tex:SetHeight(GLOW_DOT_SIZE)
-            f.textures[i] = tex
-        end
-        f:SetScript("OnSizeChanged", DotGlowOnSizeChanged)
-        btn._banbiPixelGlow = f
-    end
-    f:Show()
-    for g = 1, GLOW_GROUPS do
-        f.timer[g] = (g - 1) / GLOW_GROUPS
-    end
-    DotGlowOnSizeChanged(f)
-    f:SetScript("OnUpdate", DotGlowOnUpdate)
-    btn._banbiGlowOn = true
+    addon:StopPixelGlow(btn, "BanbiAspect")
 end
 
 local function CreateButton(i)
