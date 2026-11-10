@@ -295,6 +295,7 @@ local function BuildOptions()
                 "runeBar",
                 "astralEnhance",
                 "autoTrack",
+                "aspectBar",
             }, false),
             social = BuildTabFromFeatures(L["Social"] or "Social", 5, {
                 "friendSync",

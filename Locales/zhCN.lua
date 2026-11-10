@@ -33,7 +33,7 @@ L["Auto Join LFG Channel"] = "自动加入寻求组队"
 L["Join LookingForGroup on login (after a short delay)."] = "登录约 5 秒后自动加入寻求组队频道。"
 L["Button Text Size"] = "按钮文字大小"
 L["Reset to Above Chat"] = "重置到聊天框上方"
-L["Shift+drag to move the chat bar. Button size/spacing: ElvUI → Skins → ChatBar."] = "Shift+拖动移动聊天栏。按钮大小/间距：ElvUI → 插件美化 → ChatBar。"
+L["Shift+drag to move the chat bar. Button size/spacing: ElvUI → Skins → ChatBar."] = "Shift+拖动移动聊天栏。按钮大小/间距：ElvUI → 插件皮肤 → 聊天条。"
 L["Drag the text to move it."] = "直接拖动文字可移动位置。"
 L["Drag the bar to move it."] = "直接拖动信息栏可移动位置。"
 L["Chat Timestamps"] = "聊天时间戳"
@@ -274,4 +274,34 @@ L["Attack Power"] = "攻强"
 L["Ranged Attack Power"] = "远程攻强"
 L["Crit"] = "爆击"
 L["Haste"] = "急速"
+
+L["Aspect Bar"] = "守护条"
+L["Hunter only: show every learned Aspect as a clickable button, highlight the active one."] =
+    "仅猎人：把已学会的守护列成一排可点击按钮，当前生效的守护金色高亮；位置由 ElvUI 锚点调整，可调尺寸与间距。"
+L["Aspect Bar Help"] =
+    "自动读取姿态栏里已学会的守护；点击按钮施放对应守护，当前守护金色高亮，鼠标悬停显示名称。位置请在 ElvUI → 锚点 中调整「守护条」；下方可改按钮尺寸、间距、每行按钮数。开启「挨打自动换守护」后，猎豹/豹群挨打会自动换成选定守护（依赖客户端不拦截插件施法）。战斗中只刷新高亮，尺寸改动在脱战后生效。"
+L["Show backdrop"] = "显示背景"
+L["Button Size"] = "按钮尺寸"
+L["Button Spacing"] = "按钮间距"
+L["Buttons Per Row"] = "每行按钮数"
+L["Reset Position"] = "重置位置"
+L["Active aspect"] = "当前生效"
+L["Click to switch aspect"] = "点击切换到该守护"
+L["Aspect"] = "守护"
+
+L["Auto-switch when hit"] = "挨打自动换守护"
+L["While in Cheetah/Pack, taking a hit switches to the fallback Aspect (needs a client that does not block addon casting)."] =
+    "猎豹/豹群守护下挨打时，自动切换到下方选定的守护。依赖客户端不拦截插件施法（官方客户端会拦并提示；本服改客户端可用）。"
+L["Fallback Aspect"] = "切换目标守护"
+L["Which Aspect to switch to when you take a hit in Cheetah/Pack."] = "猎豹/豹群挨打后自动换成哪个守护。"
+L["Aspect of the Monkey"] = "灵猴守护"
+L["Aspect of the Hawk"] = "雄鹰守护"
+L["Aspect of the Dragonhawk"] = "龙鹰守护"
+L["AspectBar: auto-switch blocked"] =
+    "本客户端拦截了插件施法（CastSpellByName），守护自动切换不可用；守护条的显示与手动点击不受影响。"
+L["AspectBar: fallback aspect missing"] = "没有找到可切换的守护：%s"
+L["Aspect Bar Mover Hint"] = "位置：ElvUI → 锚点 → 守护条。"
+L["Highlight active aspect"] = "高亮当前守护"
+L["Gold border and glow on the currently active Aspect; dim the others."] =
+    "当前生效的守护显示金色边框，并有金色点点沿按钮边缘跑动（类似 WA），不遮挡图标。"
 

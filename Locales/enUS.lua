@@ -276,3 +276,30 @@ L["Ranged Attack Power"] = true
 L["Crit"] = true
 L["Haste"] = true
 
+L["Aspect Bar"] = true
+L["Hunter only: show every learned Aspect as a clickable button, highlight the active one."] = true
+L["Aspect Bar Help"] =
+    "Reads your learned Aspects from the stance bar. Click a button to cast that Aspect (real clicks only). The active Aspect is highlighted; hover for its name. Move the bar via ElvUI Movers; sliders below control button size, spacing and buttons per row. With 'Auto-switch when hit' on, taking a hit in Cheetah/Pack switches to the chosen fallback Aspect (needs a client that does not block addon casting). In combat only the highlight updates; layout changes apply after combat."
+L["Show backdrop"] = true
+L["Button Size"] = true
+L["Button Spacing"] = true
+L["Buttons Per Row"] = true
+L["Reset Position"] = true
+L["Active aspect"] = true
+L["Click to switch aspect"] = true
+L["Aspect"] = true
+
+L["Auto-switch when hit"] = true
+L["While in Cheetah/Pack, taking a hit switches to the fallback Aspect (needs a client that does not block addon casting)."] = true
+L["Fallback Aspect"] = true
+L["Which Aspect to switch to when you take a hit in Cheetah/Pack."] = true
+L["Aspect of the Monkey"] = true
+L["Aspect of the Hawk"] = true
+L["Aspect of the Dragonhawk"] = true
+L["AspectBar: auto-switch blocked"] = true
+L["AspectBar: fallback aspect missing"] = true
+L["Aspect Bar Mover Hint"] = "Position: ElvUI → Movers (Aspect Bar)."
+L["Highlight active aspect"] = true
+L["Gold border and glow on the currently active Aspect; dim the others."] =
+    "Gold border + golden dots running along the button edge (WA Autocast-style); icon stays clear."
+
