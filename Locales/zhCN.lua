@@ -204,16 +204,21 @@ L["When leaving combat, restore the tracking you had before the fight (e.g. herb
 L["Astral Enhance"] = "星界强化"
 L["Astral Enhance Desc"] = "对星界铸造者/锻造者自动点非好运符强化，直到未排除的属性达到设定等级（默认 9/10）。"
 L["Astral Enhance Help"] =
-    "用法：穿齐要强化的装备 → 选中星界铸造者/锻造者 →「开始强化」或 /banbiastral。按对话装备列表逐件处理：每件未排除属性升到目标后再下一件；不点好运符。可用「装备名过滤」「排除属性」缩小范围。Shift+拖动面板。"
+    "用法：穿齐要强化的装备 → 选中星界铸造者/锻造者 →「开始强化」或 /banbiastral。按对话装备列表逐件处理：每件未排除属性升到目标后再下一件；不点好运符。可用「装备名过滤」「跳过属性预设」或「排除属性」缩小范围。Shift+拖动面板。"
 L["Astral target level"] = "目标强化等级"
 L["Astral target level desc"] = "每条未排除属性强化到该等级后跳过（建议 9，留 10 给好运符）。"
 L["Astral click delay"] = "点击间隔（秒）"
 L["Astral click delay desc"] = "对话翻页/重开之间的等待，过小可能点空。"
 L["Astral item filter"] = "装备名过滤（可选）"
 L["Astral item filter desc"] = "只处理名称包含该关键字的列表装备；留空则按列表顺序处理全部。"
+L["Astral attr exclude preset"] = "跳过属性预设"
+L["Astral attr exclude preset desc"] =
+    "一键填入排除列表：法系跳过力量/敏捷/攻击强度，非法系跳过法术强度/智力/精神。仍可在下方手动修改。"
+L["Astral attr preset caster"] = "法系（跳过力量/敏捷/攻击强度）"
+L["Astral attr preset phys"] = "非法系（跳过法术强度/智力/精神）"
 L["Astral attr exclude"] = "排除属性（可选）"
 L["Astral attr exclude desc"] =
-    "逗号/顿号分隔，如「攻击强度,力量,敏捷」。填写后需按回车确认。这些属性永不点击；升级页若已选中也会跳过。未排除的都达目标后即视为该件完成。"
+    "逗号/顿号分隔，如「攻击强度,力量,敏捷」。填写后需按回车确认。这些属性永不点击；升级页若已选中也会跳过。未排除的都达目标后即视为该件完成。也可先用上方预设填入。"
 L["Astral: exclude active"] = "排除属性已生效：%s"
 L["Astral: starting exclude"] = "开始… 排除 %s"
 L["Astral: skip excluded attr"] = "[%s] 跳过排除属性：%s"

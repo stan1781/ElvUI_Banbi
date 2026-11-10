@@ -140,10 +140,8 @@ local function AttrKey(s)
     return (gsub(s, "%s+", ""))
 end
 
--- Build { [attrKey]=true } from cfg.attrExclude ("力量,敏捷" / "力量、敏捷" / "力量，敏捷").
-local function GetAttrExcludeSet()
-    local cfg = Cfg()
-    local raw = cfg and cfg.attrExclude
+-- Build { [attrKey]=true } from an exclude string ("力量,敏捷" / "力量、敏捷" / "力量，敏捷").
+local function ParseAttrExclude(raw)
     local set = {}
     if type(raw) ~= "string" or raw == "" then
         return set
@@ -162,6 +160,44 @@ local function GetAttrExcludeSet()
         end
     end
     return set
+end
+
+local function GetAttrExcludeSet()
+    local cfg = Cfg()
+    return ParseAttrExclude(cfg and cfg.attrExclude)
+end
+
+-- Exact gossip names: 攻击强度 / 法术强度 (not short forms).
+local ATTR_EXCLUDE_PRESETS = {
+    caster = "力量,敏捷,攻击强度",
+    phys = "法术强度,智力,精神",
+}
+
+local function ExcludeSetsEqual(a, b)
+    local n, m = 0, 0
+    for k in pairs(a) do
+        if not b[k] then
+            return false
+        end
+        n = n + 1
+    end
+    for _ in pairs(b) do
+        m = m + 1
+    end
+    return n == m
+end
+
+local function GetAttrExcludePreset()
+    local current = GetAttrExcludeSet()
+    if not next(current) then
+        return nil
+    end
+    for key, raw in pairs(ATTR_EXCLUDE_PRESETS) do
+        if ExcludeSetsEqual(current, ParseAttrExclude(raw)) then
+            return key
+        end
+    end
+    return nil
 end
 
 local function FormatExcludeList(set)
@@ -1033,6 +1069,21 @@ addon:RegisterFeature(KEY, {
                 local cfg = Cfg()
                 if cfg then
                     cfg.itemFilter = val or ""
+                end
+            end,
+        })
+        C:AddSelect(_, {
+            label = L["Astral attr exclude preset"],
+            desc = L["Astral attr exclude preset desc"],
+            values = {
+                caster = L["Astral attr preset caster"],
+                phys = L["Astral attr preset phys"],
+            },
+            getFunc = GetAttrExcludePreset,
+            setFunc = function(val)
+                local cfg = Cfg()
+                if cfg and ATTR_EXCLUDE_PRESETS[val] then
+                    cfg.attrExclude = ATTR_EXCLUDE_PRESETS[val]
                 end
             end,
         })
