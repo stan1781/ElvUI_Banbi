@@ -417,7 +417,7 @@ local function BuildText()
     local parts = {}
     if cfg.showCorruption ~= false then
         local net = ComputeNetCorruption(gearCorruption, resistCorruption, dynamicCorruption)
-        parts[#parts + 1] = format("|cff9420e6%s %d|r", L["Corruption Overflow"] or "腐蚀溢出", net)
+        parts[#parts + 1] = format("|cff9420e6%s %d|r", L["Corruption Overflow"] or "腐蚀", net)
     end
     if cfg.showPower ~= false then
         parts[#parts + 1] = format("%s %d", GetPowerLabel(powerKind), floor(GetPowerValue(powerKind) + 0.5))

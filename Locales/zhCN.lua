@@ -254,7 +254,7 @@ L["AutoLearn: session cleared"] = "已清空本会话自动学习记录"
 
 L["Stat Bar"] = "属性条"
 L["Show corruption overflow, attack/spell power, crit, and haste on a movable bar."] = "可拖动条：腐蚀溢出、攻强/法强、爆击、急速。"
-L["Corruption Overflow"] = "腐蚀溢出"
+L["Corruption Overflow"] = "腐蚀"
 L["Show Corruption Overflow"] = "显示腐蚀溢出"
 L["Show Power"] = "显示攻强/法强"
 L["Show Crit"] = "显示爆击"
