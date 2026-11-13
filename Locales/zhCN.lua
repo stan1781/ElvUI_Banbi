@@ -298,4 +298,8 @@ L["Aspect Bar Mover Hint"] = "位置：ElvUI → 锚点 → 守护条。"
 L["Highlight active aspect"] = "高亮当前守护"
 L["Gold border and glow on the currently active Aspect; dim the others."] =
     "当前生效的守护显示金色边框，并有金色点点沿按钮边缘跑动（类似 WA），不遮挡图标。"
-
+L["Gold Format"] = "金币格式"
+L["Show gold amounts of 10,000 and above as 万/亿 in bags, datatexts, and mailbox inbox/send."] =
+    "背包、信息条、邮箱收件箱和发件里的金币，达到 1 万及以上时显示为万、亿，例如 9000万。"
+L["Examples: 90000000 → 9000万, 150000000 → 1.5亿. Mail money input boxes stay numeric so you can still type an amount."] =
+    "例如：90000000 显示为 9000万，150000000 显示为 1.5亿。发件时填写金额的输入框仍为数字，方便输入。"

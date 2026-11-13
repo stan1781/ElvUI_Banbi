@@ -296,4 +296,6 @@ L["Aspect Bar Mover Hint"] = "Position: ElvUI → Movers (Aspect Bar)."
 L["Highlight active aspect"] = true
 L["Gold border and glow on the currently active Aspect; dim the others."] =
     "Gold border + golden dots running along the button edge (WA Autocast-style); icon stays clear."
-
+L["Gold Format"] = true
+L["Show gold amounts of 10,000 and above as 万/亿 in bags, datatexts, and mailbox inbox/send."] = true
+L["Examples: 90000000 → 9000万, 150000000 → 1.5亿. Mail money input boxes stay numeric so you can still type an amount."] = true

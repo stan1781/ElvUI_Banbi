@@ -3,7 +3,7 @@
 ## Notes: ElvUI 增强：移速、信息栏、聊天栏、装备列表、符文条、装备助手、好友同步（替代 bbTools/TinyInspect/FriendsMenuXP/MotionSpeed/ChatBar TokenBar）
 ## Title-zhCN: |cff1784d1E|r|cffe5e3e3lvUI|r |cff1784d1斑比增强|r
 ## Author: 斑比
-## Version: 1.0.0
+## Version: 1.0.1
 ## SavedVariables: ElvUI_BanbiDB
 ## RequiredDeps: ElvUI
 ## OptionalDeps: ElvUI_AddOnSkins, BagSync
@@ -19,6 +19,7 @@ Migrate.lua
 Options.lua
 
 Modules\ClientCompat.lua
+Modules\MoneyFormat.lua
 Modules\MotionSpeed.lua
 Modules\AutoTrack.lua
 Modules\PixelGlow.lua

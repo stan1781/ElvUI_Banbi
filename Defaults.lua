@@ -12,6 +12,9 @@ addon.defaults = {
                 posX = 0,
                 posY = 120,
             },
+            moneyFormat = {
+                enabled = true,
+            },
             infoBar = {
                 enabled = true,
                 fontSize = 12,
