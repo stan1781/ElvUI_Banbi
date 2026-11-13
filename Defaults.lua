@@ -15,6 +15,10 @@ addon.defaults = {
             moneyFormat = {
                 enabled = true,
             },
+            -- Module master switch only; per-character lists live in char.autoVendor.
+            autoVendor = {
+                enabled = true,
+            },
             infoBar = {
                 enabled = true,
                 fontSize = 12,
@@ -136,6 +140,22 @@ addon.defaults = {
     },
     char = {
         chatEditHistory = {},
+        -- Per-character vendor sell/buy (reagents differ by class).
+        autoVendor = {
+            sellEnabled = true,           -- bag-button sell/destroy only (never auto on merchant open)
+            buyEnabled = true,
+            scanOrder = "asc",
+            scanSlotLimit = 80,
+            sellZoneSlots = 0,
+            destroyUnsellable = false,
+            maxCorruption = 0,
+            sellInterval = 0.2,
+            chatFeedback = true,
+            sellList = {},
+            buyList = {},
+            sellListText = "",
+            buyListText = "",
+        },
     },
     global = {
         migrated = {},
@@ -150,6 +170,14 @@ addon.defaults = {
                 autoSyncOnLogin = false,
                 autoCleanOnLogin = true,
             },
+        },
+        -- Shared across characters: open legendary chests (auto-loot is game-side).
+        chestOpen = {
+            itemID = 64827, -- 艾泽拉斯传奇宝箱
+            interval = 0.4,
+            scanOrder = "asc",
+            scanSlotLimit = 0, -- 0 = all bags
+            chatFeedback = true,
         },
         version = 1,
     },

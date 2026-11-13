@@ -152,10 +152,43 @@ function addon:Migrate()
                 if type(old.global.equipment) == "table" then
                     CopyTable(old.global.equipment, g.equipment)
                 end
-                if type(old.global.friendSync) == "table" then
-                    CopyTable(old.global.friendSync, g.friendSync)
+            if type(old.global.friendSync) == "table" then
+                CopyTable(old.global.friendSync, g.friendSync)
+            end
+        end
+    end
+
+    -- Profile autoVendor settings → char.autoVendor (once per character).
+    -- Uses a char flag so each alt migrates on first login after the update.
+    do
+        local char = addon.db.char
+        if type(char) == "table" and not char.autoVendorMigrated then
+            char.autoVendorMigrated = true
+            local src = addon.db.profile.features and addon.db.profile.features.autoVendor
+            local dst = char.autoVendor
+            if type(src) == "table" then
+                if type(dst) ~= "table" then
+                    dst = {}
+                    char.autoVendor = dst
+                end
+                local keys = {
+                    "sellEnabled", "buyEnabled", "scanOrder", "scanSlotLimit", "sellZoneSlots",
+                    "destroyUnsellable", "maxCorruption", "sellInterval", "chatFeedback",
+                    "sellList", "buyList", "sellListText", "buyListText",
+                }
+                for i = 1, #keys do
+                    local k = keys[i]
+                    if src[k] ~= nil then
+                        if type(src[k]) == "table" then
+                            dst[k] = dst[k] or {}
+                            CopyTable(src[k], dst[k])
+                        else
+                            dst[k] = src[k]
+                        end
+                    end
                 end
             end
         end
     end
+end
 end

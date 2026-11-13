@@ -118,6 +118,17 @@ local function NewOptionBuilder(args, startOrder)
                 end
             end,
         }
+        if opt.multiline then
+            -- ElvUI AceConfig: multiline is bool or line-count; rows/cols are invalid keys.
+            if type(opt.multiline) == "number" then
+                entry.multiline = opt.multiline
+            else
+                entry.multiline = opt.rows or 6
+            end
+        end
+        if opt.width then
+            entry.width = opt.width
+        end
         if opt.disabled then
             entry.disabled = opt.disabled
         end
@@ -283,22 +294,25 @@ local function BuildOptions()
                 "moneyFormat",
                 "autoLearnRecipes",
             }, true),
-            chat = BuildTabFromFeatures(L["Chat"] or "Chat", 2, {
+            vendor = BuildTabFromFeatures(L["Vendor"] or "Vendor", 2, {
+                "autoVendor",
+            }, false),
+            chat = BuildTabFromFeatures(L["Chat"] or "Chat", 3, {
                 "chatEnhance",
             }, false),
-            equipment = BuildTabFromFeatures(L["Equipment"] or "Equipment", 3, {
+            equipment = BuildTabFromFeatures(L["Equipment"] or "Equipment", 4, {
                 "inspectPanel",
                 "itemInfo", -- 未进 TOC 时 GetFeature 为 nil，分区自动跳过
                 "equipmentHelper",
                 "bagCorruption",
             }, false),
-            combat = BuildTabFromFeatures(L["Combat"] or "Combat", 4, {
+            combat = BuildTabFromFeatures(L["Combat"] or "Combat", 5, {
                 "runeBar",
                 "astralEnhance",
                 "autoTrack",
                 "aspectBar",
             }, false),
-            social = BuildTabFromFeatures(L["Social"] or "Social", 5, {
+            social = BuildTabFromFeatures(L["Social"] or "Social", 6, {
                 "friendSync",
                 "friendsMenuXP",
             }, false),
