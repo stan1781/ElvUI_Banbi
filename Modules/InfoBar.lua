@@ -159,6 +159,9 @@ local function Relayout()
 end
 
 local function StartDrag()
+    if not IsShiftKeyDown() then
+        return
+    end
     if not frame or not frame:IsMovable() then
         return
     end
@@ -280,7 +283,7 @@ addon:RegisterFeature(KEY, {
     BuildOptions = function(section, C)
         C:AddDescription(
             section,
-            L["Drag the bar to move it."] or "Drag the bar to move it."
+            L["Drag the bar to move it."] or "Shift+drag the bar to move it."
         )
         C:AddSlider(section, {
             label = L["Font Size"],

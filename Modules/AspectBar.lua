@@ -17,9 +17,9 @@ local WHITE = "Interface\\Buttons\\WHITE8X8"
 
 -- 首次使用 / 旧配置缺字段时补齐用；只补缺，不清空用户原有值。
 local DEFAULTS = {
-    buttonSize = 36,
+    buttonSize = 28,
     spacing = 4,
-    columns = 6,
+    columns = 12,
     anchor = "CENTER",
     posX = 0,
     posY = -160,
