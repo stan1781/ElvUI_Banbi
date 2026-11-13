@@ -190,5 +190,75 @@ function addon:Migrate()
             end
         end
     end
+
+    -- Seed the default quest restock list once, if this character has no buy list yet.
+    do
+        local char = addon.db.char
+        if type(char) == "table" and not char.autoVendorDefaultBuyList then
+            char.autoVendorDefaultBuyList = true
+            local dst = char.autoVendor
+            if type(dst) ~= "table" then
+                dst = {}
+                char.autoVendor = dst
+            end
+            local emptyList = type(dst.buyList) ~= "table"
+            if not emptyList then
+                emptyList = true
+                for _ in pairs(dst.buyList) do
+                    emptyList = false
+                    break
+                end
+            end
+            local emptyText = type(dst.buyListText) ~= "string" or dst.buyListText == ""
+            if emptyList and emptyText then
+                local def = addon.defaults and addon.defaults.char and addon.defaults.char.autoVendor
+                if type(def) == "table" then
+                    dst.buyList = {}
+                    if type(def.buyList) == "table" then
+                        for id, count in pairs(def.buyList) do
+                            dst.buyList[id] = count
+                        end
+                    end
+                    dst.buyListText = def.buyListText or ""
+                end
+            end
+        end
+    end
+
+    -- Remove priest reagent 44615 from the previously seeded default buy list.
+    do
+        local char = addon.db.char
+        if type(char) == "table" and not char.autoVendorRemoveBuy44615 then
+            char.autoVendorRemoveBuy44615 = true
+            local dst = char.autoVendor
+            if type(dst) == "table" then
+                if type(dst.buyList) == "table" then
+                    dst.buyList[44615] = nil
+                    dst.buyList["44615"] = nil
+                end
+                if type(dst.buyListText) == "string" and dst.buyListText ~= "" then
+                    local lines = {}
+                    local text = dst.buyListText:gsub("\r\n", "\n"):gsub("\r", "\n")
+                    for line in (text .. "\n"):gmatch("(.-)\n") do
+                        local keep = true
+                        if line:match("item:44615") or line:match("|Hitem:44615") then
+                            keep = false
+                        else
+                            local id = line:match("^%s*(%d+)%s")
+                            if tonumber(id) == 44615 then
+                                keep = false
+                            end
+                        end
+                        if keep and line ~= "" then
+                            lines[#lines + 1] = line
+                        elseif keep then
+                            -- preserve trailing/empty lines only if they were meaningful; drop bare empties from strip
+                        end
+                    end
+                    dst.buyListText = table.concat(lines, "\n")
+                end
+            end
+        end
+    end
 end
 end

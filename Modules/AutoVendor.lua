@@ -11,6 +11,8 @@ local CORRUPTION_PATTERN = "%+(%d+)%s*腐蚀"
 local DESTROY_POPUP_TIMEOUT = 3.0
 local LOCK_RETRY_MAX = 25
 local DEFAULT_CHEST_ID = 64827
+-- Never sell or destroy items at or above this item level.
+local MIN_SKIP_ITEM_LEVEL = 284
 
 -- Never sell or destroy these item IDs (hard whitelist).
 local PROTECT_IDS = {
@@ -371,6 +373,45 @@ local function GetVendorPrice(itemID, link)
     return tonumber(sellPrice) or 0
 end
 
+local function GetItemLevel(itemID, link)
+    local ilvl
+    if itemID then
+        ilvl = select(4, GetItemInfo(itemID))
+    end
+    if ilvl == nil and link then
+        ilvl = select(4, GetItemInfo(link))
+    end
+    if ilvl == nil then
+        return nil
+    end
+    return tonumber(ilvl)
+end
+
+-- The openable chest itself (configured ID, default 64827, or name containing 宝箱).
+local function IsChestItem(itemID, link)
+    if itemID then
+        if itemID == DEFAULT_CHEST_ID then
+            return true
+        end
+        local cfg = ChestCfg()
+        local configured = cfg and tonumber(cfg.itemID)
+        if configured and itemID == configured then
+            return true
+        end
+    end
+    local name
+    if itemID then
+        name = GetItemInfo(itemID)
+    end
+    if (not name or name == "") and link then
+        name = GetItemInfo(link)
+    end
+    if name and find(name, "宝箱", 1, true) then
+        return true
+    end
+    return false
+end
+
 local function IsQuestItem(itemID, bag, slot)
     if GetContainerItemQuestInfo and bag and slot then
         local isQuest = GetContainerItemQuestInfo(bag, slot)
@@ -622,6 +663,34 @@ local function ClassifyQueueEntry(entry)
     return "ok"
 end
 
+-- 3.3.5 FrameXML: honorPoints, arenaPoints, itemCount
+-- Later clients: itemCount only. Detect by the third return.
+local function GetMerchantCostBreakdown(index)
+    local r1, r2, r3 = GetMerchantItemCostInfo(index)
+    if r3 ~= nil then
+        return tonumber(r1) or 0, tonumber(r2) or 0, tonumber(r3) or 0
+    end
+    return 0, 0, tonumber(r1) or 0
+end
+
+local function GetOwnedCostAmount(link)
+    if not link or link == "" then
+        return nil
+    end
+    local currencyID = tonumber(match(link, "|Hcurrency:(%d+)") or match(link, "currency:(%d+)"))
+    if currencyID and GetCurrencyInfo then
+        local _, amount = GetCurrencyInfo(currencyID)
+        if amount ~= nil then
+            return tonumber(amount) or 0
+        end
+    end
+    local itemID = ParseItemID(link)
+    if itemID then
+        return GetItemCount(itemID) or 0
+    end
+    return nil
+end
+
 local function CanPayMerchantCost(index, buyCount, unitPrice, moneyHint)
     local costCopper = ceil((tonumber(unitPrice) or 0) * (buyCount or 0))
     local money = moneyHint
@@ -636,12 +705,9 @@ local function CanPayMerchantCost(index, buyCount, unitPrice, moneyHint)
     if not extendedCost then
         return true
     end
+    -- If cost APIs are missing, let the game enforce the purchase.
     if not GetMerchantItemCostInfo then
-        return false, "extended"
-    end
-    local n = GetMerchantItemCostInfo(index) or 0
-    if n <= 0 then
-        return false, "extended"
+        return true
     end
 
     quantity = tonumber(quantity) or 1
@@ -649,20 +715,26 @@ local function CanPayMerchantCost(index, buyCount, unitPrice, moneyHint)
         quantity = 1
     end
     local packs = ceil(buyCount / quantity)
+    local honor, arena, itemCount = GetMerchantCostBreakdown(index)
 
-    for i = 1, n do
-        if not GetMerchantItemCostItem then
-            return false, "extended"
-        end
-        local _, value, link = GetMerchantItemCostItem(index, i)
-        value = tonumber(value) or 0
-        local need = value * packs
-        if not link then
-            return false, "extended"
-        end
-        local id = ParseItemID(link)
-        if not id or (GetItemCount(id) or 0) < need then
-            return false, "extended"
+    if honor > 0 and GetHonorCurrency and (GetHonorCurrency() or 0) < honor * packs then
+        return false, "currency"
+    end
+    if arena > 0 and GetArenaCurrency and (GetArenaCurrency() or 0) < arena * packs then
+        return false, "currency"
+    end
+
+    if itemCount > 0 and GetMerchantItemCostItem then
+        for i = 1, itemCount do
+            local _, value, link = GetMerchantItemCostItem(index, i)
+            value = tonumber(value) or 0
+            local need = value * packs
+            if need > 0 then
+                local have = GetOwnedCostAmount(link)
+                if have ~= nil and have < need then
+                    return false, "currency"
+                end
+            end
         end
     end
     return true
@@ -777,6 +849,8 @@ local function RunBuyRestock()
                     local label = ItemLabel(link, name, id)
                     if skippedReason == "money" then
                         Print(format(L["AutoVendor: not enough money"] or "金币不足，已跳过购买：%s", label))
+                    elseif skippedReason == "currency" then
+                        Print(format(L["AutoVendor: not enough currency"] or "兑换货币不足，已跳过购买：%s", label))
                     else
                         Print(format(L["AutoVendor: extended cost skipped"] or "无法确认货币消耗，已跳过购买：%s", label))
                     end
@@ -945,7 +1019,7 @@ local function BuildQueue(force)
         if not itemID then
             return
         end
-        if IsProtectedItem(itemID) then
+        if IsProtectedItem(itemID) or IsChestItem(itemID) then
             return
         end
 
@@ -965,9 +1039,17 @@ local function BuildQueue(force)
         end
 
         local link = GetContainerItemLink(bag, slot)
+        if IsChestItem(itemID, link) then
+            return
+        end
+
         local itemPrice = GetVendorPrice(itemID, link)
-        if itemPrice == nil then
+        local itemLevel = GetItemLevel(itemID, link)
+        if itemPrice == nil or itemLevel == nil then
             QueryItemInfo(link or ("item:" .. tostring(itemID)))
+            return
+        end
+        if itemLevel >= MIN_SKIP_ITEM_LEVEL then
             return
         end
 
@@ -1534,12 +1616,12 @@ addon:RegisterFeature(KEY, {
         C:AddDescription(
             section,
             L["Auto Vendor Help"]
-                or "出售/摧毁仅由背包「出售区」按钮手动触发。白名单物品永不出售/摧毁。流程：开箱 → 开商人 → 点出售区。"
+                or "出售/摧毁仅由背包「出售区」按钮手动触发。白名单物品、装等 284 及以上、以及箱子本身永不出售/摧毁。流程：开箱 → 开商人 → 点出售区。"
         )
         C:AddDescription(
             section,
             L["Auto Vendor protect list"]
-                or "永不出售/摧毁：60407, 64820, 64149, 69496, 69508, 69502, 60408, 64821, 64150, 69501。"
+                or "永不出售/摧毁：白名单 60407, 64820, 64149, 69496, 69508, 69502, 60408, 64821, 64150, 69501；装等 284 及以上；宝箱本身（默认 64827，以及设置中的开箱 ID）。"
         )
 
         C:AddDescription(section, L["Auto Vendor: chest header"] or "|cff1784d1开箱（全账号）|r")
