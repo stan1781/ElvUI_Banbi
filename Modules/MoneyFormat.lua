@@ -1,35 +1,38 @@
 -- ElvUI_Banbi — compact gold display (万 / 亿) for bags, datatexts, and mail.
 
-local ADDON_NAME, addon = ...
+local _, addon = ...
 local L = addon.L
 
 local KEY = "moneyFormat"
 
 local abs, floor = math.abs, math.floor
 local format = string.format
-local hooksecurefunc = hooksecurefunc
 local tonumber, tostring, type = tonumber, tostring, type
 
-local COLOR_COPPER, COLOR_SILVER, COLOR_GOLD = "|cffeda55f", "|cffc7c7cf", "|cffffd700"
 local ICON_COPPER = "|TInterface\\MoneyFrame\\UI-CopperIcon:12:12|t"
 local ICON_SILVER = "|TInterface\\MoneyFrame\\UI-SilverIcon:12:12|t"
 local ICON_GOLD = "|TInterface\\MoneyFrame\\UI-GoldIcon:12:12|t"
 
 local active = false
 local hooked = false
+local moneyFrameHooked = false
 local orig = {}
 
-local function Cfg()
-    return addon:GetFeatureConfig(KEY)
-end
-
-local function TrimDecimals(value)
-    local text = format("%.2f", value)
-    text = text:gsub("0+$", ""):gsub("%.$", "")
-    return text
+-- Format centi-units (value * 100, already rounded) as "N", "N.D", or "N.DD" + unit.
+local function FormatCompact(centi, unit)
+    local whole = floor(centi / 100)
+    local frac = centi % 100
+    if frac == 0 then
+        return format("%d%s", whole, unit)
+    end
+    if frac % 10 == 0 then
+        return format("%d.%d%s", whole, frac / 10, unit)
+    end
+    return format("%d.%02d%s", whole, frac, unit)
 end
 
 -- 90000000 -> 9000万, 150000000 -> 1.5亿, 12345 -> 1.23万, 9999 stays 9999
+-- Uses integer rounding to avoid float errors (e.g. 100500000 -> 1.01亿, not 1亿).
 function addon.FormatGoldAmount(gold)
     gold = tonumber(gold) or 0
     local sign = ""
@@ -40,137 +43,57 @@ function addon.FormatGoldAmount(gold)
     gold = floor(gold + 0.5)
 
     if gold >= 100000000 then
-        local yi = gold / 100000000
-        local rounded = floor(yi * 100 + 0.5) / 100
-        if rounded == floor(rounded) then
-            return sign .. format("%d亿", rounded)
-        end
-        return sign .. TrimDecimals(rounded) .. "亿"
+        -- round(gold / 1e8, 2) via integer: centi-亿 = round(gold / 1e6)
+        return sign .. FormatCompact(floor((gold + 500000) / 1000000), "亿")
     elseif gold >= 10000 then
-        local wan = gold / 10000
-        local rounded = floor(wan * 100 + 0.5) / 100
-        if rounded >= 10000 then
-            return sign .. "1亿"
+        -- round(gold / 1e4, 2) via integer: centi-万 = round(gold / 100)
+        local centi = floor((gold + 50) / 100)
+        if centi >= 1000000 then
+            -- 10000万 rounds up to 1亿
+            return sign .. FormatCompact(floor((gold + 500000) / 1000000), "亿")
         end
-        if rounded == floor(rounded) then
-            return sign .. format("%d万", rounded)
-        end
-        return sign .. TrimDecimals(rounded) .. "万"
+        return sign .. FormatCompact(centi, "万")
     end
 
     return sign .. format("%d", gold)
 end
 
-local function GoldText(gold)
-    return addon.FormatGoldAmount(gold)
-end
-
-local function ElvLocale()
-    if ElvUI then
-        local _, locale = unpack(ElvUI)
-        return locale
+-- Replace the first gold digit run in an ElvUI/BagSync money string.
+-- goldAbs: absolute gold coins; signed: true when SHORT may include a leading minus.
+local function ReplaceGoldInText(text, goldAbs, style, signed)
+    if type(text) ~= "string" or goldAbs < 10000 then
+        return text
     end
+    local goldstr = addon.FormatGoldAmount(signed and -goldAbs or goldAbs)
+    -- SHORT uses "%.1f" on copper/10000, so digits may be "12345.6" rather than "12345".
+    if style == "SHORT" then
+        local replaced, n = text:gsub("^%-?%d+%.%d+", goldstr, 1)
+        if n > 0 then
+            return replaced
+        end
+    end
+    local raw = tostring(goldAbs)
+    local idx = text:find(raw, 1, true)
+    if not idx then
+        return text
+    end
+    return text:sub(1, idx - 1) .. goldstr .. text:sub(idx + #raw)
 end
 
-local function FormatMoney(amount, style, textonly)
-    local locale = ElvLocale()
-    local coppername = textonly and (locale and locale["copperabbrev"] or "c") or ICON_COPPER
-    local silvername = textonly and (locale and locale["silverabbrev"] or "s") or ICON_SILVER
-    local goldname = textonly and (locale and locale["goldabbrev"] or "g") or ICON_GOLD
-
+local function ApplyCompactMoney(text, amount, style)
+    if not active or type(text) ~= "string" then
+        return text
+    end
     amount = tonumber(amount) or 0
-    local value = abs(amount)
-    local gold = floor(value / 10000)
-    local silver = floor((value / 100) % 100)
-    local copper = floor(value % 100)
-    local goldstr = GoldText(gold)
-
-    if not style or style == "SMART" then
-        local str = ""
-        if gold > 0 then
-            str = format("%s%s%s", goldstr, goldname, (silver > 0 or copper > 0) and " " or "")
-        end
-        if silver > 0 then
-            str = format("%s%d%s%s", str, silver, silvername, copper > 0 and " " or "")
-        end
-        if copper > 0 or value == 0 then
-            str = format("%s%d%s", str, copper, coppername)
-        end
-        return str
-    end
-
-    if style == "FULL" then
-        if gold > 0 then
-            return format("%s%s %d%s %d%s", goldstr, goldname, silver, silvername, copper, coppername)
-        elseif silver > 0 then
-            return format("%d%s %d%s", silver, silvername, copper, coppername)
-        else
-            return format("%d%s", copper, coppername)
-        end
-    elseif style == "SHORT" then
-        if gold > 0 then
-            if gold >= 10000 then
-                return format("%s%s", goldstr, goldname)
-            end
-            return format("%.1f%s", amount / 10000, goldname)
-        elseif silver > 0 then
-            return format("%.1f%s", amount / 100, silvername)
-        else
-            return format("%d%s", amount, coppername)
-        end
-    elseif style == "SHORTINT" then
-        if gold > 0 then
-            return format("%s%s", goldstr, goldname)
-        elseif silver > 0 then
-            return format("%d%s", silver, silvername)
-        else
-            return format("%d%s", copper, coppername)
-        end
-    elseif style == "CONDENSED" then
-        if gold > 0 then
-            return format("%s%s|r.%s%02d|r.%s%02d|r", COLOR_GOLD, goldstr, COLOR_SILVER, silver, COLOR_COPPER, copper)
-        elseif silver > 0 then
-            return format("%s%d|r.%s%02d|r", COLOR_SILVER, silver, COLOR_COPPER, copper)
-        else
-            return format("%s%d|r", COLOR_COPPER, copper)
-        end
-    elseif style == "BLIZZARD" then
-        if gold > 0 then
-            return format("%s%s %d%s %d%s", goldstr, goldname, silver, silvername, copper, coppername)
-        elseif silver > 0 then
-            return format("%d%s %d%s", silver, silvername, copper, coppername)
-        else
-            return format("%d%s", copper, coppername)
-        end
-    end
-
-    return FormatMoney(amount, "SMART", textonly)
-end
-
-local function FormatBagMoney(amount)
-    local str, coppername, silvername, goldname = "", "|cffeda55fc|r", "|cffc7c7cfs|r", "|cffffd700g|r"
-    amount = tonumber(amount) or 0
-    local value = abs(amount)
-    local gold = floor(value / 10000)
-    local silver = floor((value / 100) % 100)
-    local copper = floor(value % 100)
-
-    if gold > 0 then
-        str = format("%s%s%s", GoldText(gold), goldname, (silver > 0 or copper > 0) and " " or "")
-    end
-    if silver > 0 then
-        str = format("%s%d%s%s", str, silver, silvername, copper > 0 and " " or "")
-    end
-    if copper > 0 or value == 0 then
-        str = format("%s%d%s", str, copper, coppername)
-    end
-    return str
+    local gold = floor(abs(amount) / 10000)
+    -- Only SHORT embeds the sign in the leading float; other styles use abs(amount).
+    return ReplaceGoldInText(text, gold, style, style == "SHORT" and amount < 0)
 end
 
 local function CoinTexture(kind, amount)
     local icon = kind == "gold" and ICON_GOLD or (kind == "silver" and ICON_SILVER or ICON_COPPER)
     if kind == "gold" then
-        return GoldText(amount) .. icon
+        return addon.FormatGoldAmount(amount) .. icon
     end
     return tostring(amount) .. icon
 end
@@ -195,7 +118,7 @@ local function FormatPostalMoney(money, textured)
         end
     end
     if gold > 0 then
-        return sign .. format("%s金 %d银 %d铜", GoldText(gold), silver, copper)
+        return sign .. format("%s金 %d银 %d铜", addon.FormatGoldAmount(gold), silver, copper)
     elseif silver > 0 then
         return sign .. format("%d银 %d铜", silver, copper)
     else
@@ -241,7 +164,7 @@ local function ApplyMoneyFrameGold(frameName, money)
     if not goldButton or not goldButton.SetText then
         return
     end
-    goldButton:SetText(GoldText(gold))
+    goldButton:SetText(addon.FormatGoldAmount(gold))
 end
 
 local function HookPostal()
@@ -257,14 +180,11 @@ local function HookPostal()
             return FormatPostalMoney(money, true)
         end
     end
-    if not orig.PostalGetMoneyStringPlain then
+    if Postal.GetMoneyStringPlain and not orig.PostalGetMoneyStringPlain then
         orig.PostalGetMoneyStringPlain = Postal.GetMoneyStringPlain
         function Postal:GetMoneyStringPlain(money)
             if not active then
-                if orig.PostalGetMoneyStringPlain then
-                    return orig.PostalGetMoneyStringPlain(self, money)
-                end
-                return FormatPostalMoney(money, false)
+                return orig.PostalGetMoneyStringPlain(self, money)
             end
             return FormatPostalMoney(money, false)
         end
@@ -281,20 +201,7 @@ local function HookBagSync()
     orig.BagSyncBuildMoneyString = BagSync.buildMoneyString
     function BagSync:buildMoneyString(money, color)
         local text = orig.BagSyncBuildMoneyString(self, money, color)
-        if not active or type(text) ~= "string" then
-            return text
-        end
-        money = tonumber(money) or 0
-        local gold = floor(abs(money) / 10000)
-        if gold < 10000 then
-            return text
-        end
-        local raw = tostring(gold)
-        local idx = text:find(raw, 1, true)
-        if not idx then
-            return text
-        end
-        return text:sub(1, idx - 1) .. GoldText(gold) .. text:sub(idx + #raw)
+        return ApplyCompactMoney(text, money)
     end
 end
 
@@ -310,10 +217,8 @@ local function HookAll()
     if E and E.FormatMoney and not orig.FormatMoney then
         orig.FormatMoney = E.FormatMoney
         function E:FormatMoney(amount, style, textonly)
-            if not active then
-                return orig.FormatMoney(self, amount, style, textonly)
-            end
-            return FormatMoney(amount, style, textonly)
+            local text = orig.FormatMoney(self, amount, style, textonly)
+            return ApplyCompactMoney(text, amount, style)
         end
     end
 
@@ -322,24 +227,15 @@ local function HookAll()
         if B and B.FormatMoney and not orig.BagFormatMoney then
             orig.BagFormatMoney = B.FormatMoney
             function B:FormatMoney(amount)
-                if not active then
-                    return orig.BagFormatMoney(self, amount)
-                end
-                return FormatBagMoney(amount)
+                local text = orig.BagFormatMoney(self, amount)
+                return ApplyCompactMoney(text, amount)
             end
         end
     end
 
-    if type(MoneyFrame_Update) == "function" and not orig.MoneyFrame_Update then
-        orig.MoneyFrame_Update = MoneyFrame_Update
-        if hooksecurefunc then
-            hooksecurefunc("MoneyFrame_Update", ApplyMoneyFrameGold)
-        else
-            MoneyFrame_Update = function(frameName, money)
-                orig.MoneyFrame_Update(frameName, money)
-                ApplyMoneyFrameGold(frameName, money)
-            end
-        end
+    if not moneyFrameHooked and type(MoneyFrame_Update) == "function" then
+        moneyFrameHooked = true
+        hooksecurefunc("MoneyFrame_Update", ApplyMoneyFrameGold)
     end
 
     HookPostal()
