@@ -26,6 +26,7 @@ local PROTECT_IDS = {
     [64821] = true,
     [64150] = true,
     [69501] = true,
+    [65282] = true, -- 艾泽里特（开箱兑换货币）
 }
 
 local function IsProtectedItem(itemID)
@@ -204,41 +205,7 @@ local function ParseSellLine(line)
 end
 
 local function ParseBuyLine(line)
-    if not line then
-        return nil
-    end
-    line = match(line, "^%s*(.-)%s*$") or ""
-    if line == "" then
-        return nil
-    end
-
-    local id, rest
-    local linkStart, linkEnd, linkId = find(line, "|c%x%x%x%x%x%x%x%x|Hitem:(%d+).-|h.-|h|r")
-    if not linkId then
-        linkStart, linkEnd, linkId = find(line, "|Hitem:(%d+).-|h.-|h|r")
-    end
-    if not linkId then
-        linkStart, linkEnd, linkId = find(line, "|Hitem:(%d+)")
-    end
-    if not linkId then
-        linkStart, linkEnd, linkId = find(line, "item:(%d+)[:%d]*")
-    end
-
-    if linkId then
-        id = tonumber(linkId)
-        rest = (line:sub(1, linkStart - 1) .. line:sub(linkEnd + 1))
-        rest = match(rest, "^%s*(.-)%s*$") or ""
-    else
-        local plainId, trailing = match(line, "^(%d+)%s+(.+)$")
-        id = tonumber(plainId)
-        rest = trailing and (match(trailing, "^%s*(.-)%s*$") or "") or ""
-    end
-
-    local count = rest and tonumber(match(rest, "^(%d+)$"))
-    if id and count and count > 0 then
-        return id, count
-    end
-    return nil
+    return addon.ParseAutoVendorBuyLine(line)
 end
 
 local function EachLine(text, fn)
@@ -359,52 +326,39 @@ local function GetSlotItemID(bag, slot)
     return ParseItemID(GetContainerItemLink(bag, slot))
 end
 
-local function GetVendorPrice(itemID, link)
-    local sellPrice
+-- One GetItemInfo call: name, itemLevel, sellPrice. Returns nil fields when uncached.
+local function GetItemSellInfo(itemID, link)
+    local name, _, _, ilvl, _, _, _, _, _, _, sellPrice
     if itemID then
-        sellPrice = select(11, GetItemInfo(itemID))
+        name, _, _, ilvl, _, _, _, _, _, _, sellPrice = GetItemInfo(itemID)
     end
-    if sellPrice == nil and link then
-        sellPrice = select(11, GetItemInfo(link))
+    if (name == nil or ilvl == nil or sellPrice == nil) and link then
+        local n2, _, _, i2, _, _, _, _, _, _, p2 = GetItemInfo(link)
+        if name == nil or name == "" then
+            name = n2
+        end
+        if ilvl == nil then
+            ilvl = i2
+        end
+        if sellPrice == nil then
+            sellPrice = p2
+        end
     end
-    if sellPrice == nil then
-        return nil
+    if ilvl == nil and sellPrice == nil and (name == nil or name == "") then
+        return nil, nil, nil
     end
-    return tonumber(sellPrice) or 0
-end
-
-local function GetItemLevel(itemID, link)
-    local ilvl
-    if itemID then
-        ilvl = select(4, GetItemInfo(itemID))
-    end
-    if ilvl == nil and link then
-        ilvl = select(4, GetItemInfo(link))
-    end
-    if ilvl == nil then
-        return nil
-    end
-    return tonumber(ilvl)
+    return name, tonumber(ilvl), sellPrice ~= nil and (tonumber(sellPrice) or 0) or nil
 end
 
 -- The openable chest itself (configured ID, default 64827, or name containing 宝箱).
-local function IsChestItem(itemID, link)
+local function IsChestItem(itemID, name, configuredChestID)
     if itemID then
         if itemID == DEFAULT_CHEST_ID then
             return true
         end
-        local cfg = ChestCfg()
-        local configured = cfg and tonumber(cfg.itemID)
-        if configured and itemID == configured then
+        if configuredChestID and itemID == configuredChestID then
             return true
         end
-    end
-    local name
-    if itemID then
-        name = GetItemInfo(itemID)
-    end
-    if (not name or name == "") and link then
-        name = GetItemInfo(link)
     end
     if name and find(name, "宝箱", 1, true) then
         return true
@@ -750,6 +704,22 @@ local function ItemLabel(link, name, itemID)
     return tostring(itemID or "?")
 end
 
+local function MergeBuyTargets(dst, src)
+    if type(src) ~= "table" then
+        return false
+    end
+    local any = false
+    for key, count in pairs(src) do
+        local id = tonumber(key)
+        local target = tonumber(count)
+        if id and target and target > 0 then
+            dst[id] = target
+            any = true
+        end
+    end
+    return any
+end
+
 local function RunBuyRestock()
     if boughtThisVisit then
         return
@@ -763,20 +733,10 @@ local function RunBuyRestock()
     end
 
     local cfg = Cfg()
-    local buyList = cfg and cfg.buyList
-    if type(buyList) ~= "table" then
-        return
-    end
-
     local targets = {}
-    local hasTarget = false
-    for key, count in pairs(buyList) do
-        local id = tonumber(key)
-        local target = tonumber(count)
-        if id and target and target > 0 then
-            targets[id] = target
-            hasTarget = true
-        end
+    local hasTarget = MergeBuyTargets(targets, addon.autoVendorBrainQuestBuyList)
+    if MergeBuyTargets(targets, cfg and cfg.buyList) then
+        hasTarget = true
     end
     if not hasTarget then
         return
@@ -1012,6 +972,8 @@ local function BuildQueue(force)
     local maxCorruption = tonumber(cfg.maxCorruption) or 0
     local destroyUnsellable = cfg.destroyUnsellable and true or false
     local order = cfg.scanOrder or "asc"
+    local chestCfg = ChestCfg()
+    local configuredChestID = chestCfg and tonumber(chestCfg.itemID) or nil
 
     ForEachBagSlot(function(bag, slot, index)
         local inZone = zoneSize > 0 and index <= zoneSize
@@ -1019,7 +981,11 @@ local function BuildQueue(force)
         if not itemID then
             return
         end
-        if IsProtectedItem(itemID) or IsChestItem(itemID) then
+        if IsProtectedItem(itemID) then
+            return
+        end
+        -- Fast path: known chest IDs before heavier bag lookups.
+        if IsChestItem(itemID, nil, configuredChestID) then
             return
         end
 
@@ -1039,12 +1005,10 @@ local function BuildQueue(force)
         end
 
         local link = GetContainerItemLink(bag, slot)
-        if IsChestItem(itemID, link) then
+        local name, itemLevel, itemPrice = GetItemSellInfo(itemID, link)
+        if IsChestItem(itemID, name, configuredChestID) then
             return
         end
-
-        local itemPrice = GetVendorPrice(itemID, link)
-        local itemLevel = GetItemLevel(itemID, link)
         if itemPrice == nil or itemLevel == nil then
             QueryItemInfo(link or ("item:" .. tostring(itemID)))
             return
@@ -1084,7 +1048,7 @@ local function BuildQueue(force)
 end
 
 -- ---------------------------------------------------------------------------
--- Chest open (global settings; never while merchant is open)
+-- Chest open (global settings; safe while merchant is open).
 -- ---------------------------------------------------------------------------
 
 local function CountFreeBagSlots()
@@ -1120,6 +1084,32 @@ local function IsMerchantFrameOpen()
     return MerchantFrame and MerchantFrame.IsShown and MerchantFrame:IsShown()
 end
 
+local function IsMerchantSessionOpen()
+    return merchantOpen or IsMerchantFrameOpen()
+end
+
+-- UseContainerItem sells when a merchant session is open. Open chests by use-item instead.
+local function UseChestSlot(bag, slot)
+    if IsMerchantSessionOpen() and UseItemByName then
+        local link = GetContainerItemLink(bag, slot)
+        if link and link ~= "" then
+            UseItemByName(link)
+            return
+        end
+        local id = GetSlotItemID(bag, slot)
+        local name = id and GetItemInfo(id)
+        if name and name ~= "" then
+            UseItemByName(name)
+            return
+        end
+        if id then
+            UseItemByName("item:" .. tostring(id))
+            return
+        end
+    end
+    UseContainerItem(bag, slot)
+end
+
 local ProcessChestQueueHead
 
 local function EnsureChestTicker()
@@ -1153,14 +1143,6 @@ local function FinishChestOpen()
 end
 
 ProcessChestQueueHead = function()
-    if IsMerchantFrameOpen() then
-        if ChestChatEnabled() then
-            Print(L["AutoVendor: chest stop merchant"] or "商人窗口已打开，已停止开箱（避免把宝箱卖掉）。")
-        end
-        StopChestTicker()
-        ClearChestQueue()
-        return
-    end
     if InCombatLockdown and InCombatLockdown() then
         if ChestChatEnabled() then
             Print(L["AutoVendor: chest stop combat"] or "战斗中，已停止开箱。")
@@ -1189,7 +1171,7 @@ ProcessChestQueueHead = function()
                 end
                 return
             end
-            UseContainerItem(entry.bag, entry.slot)
+            UseChestSlot(entry.bag, entry.slot)
             chestOpened = chestOpened + 1
             if #chestQueue > 0 then
                 return
@@ -1237,10 +1219,6 @@ end
 local function StartChestOpen()
     if not active then
         Print(L["AutoVendor: module off"] or "请先启用「自动购卖」功能。")
-        return
-    end
-    if IsMerchantFrameOpen() then
-        Print(L["AutoVendor: chest need close merchant"] or "请先关闭商人窗口再开箱，否则会卖掉宝箱。")
         return
     end
     if InCombatLockdown and InCombatLockdown() then
@@ -1384,7 +1362,7 @@ local function RefreshBagButtonTooltips()
     if f.banbiChestButton then
         f.banbiChestButton.ttText = L["Bag button: open chests"] or "开箱"
         f.banbiChestButton.ttText2 = L["Bag button: open chests tip"]
-            or "左键：按序打开宝箱（请先关商人）。右键：停止。"
+            or "左键：按序打开宝箱（商人开着也可以）。右键：停止。"
     end
     if f.banbiSellZoneButton then
         local cfg = Cfg()
@@ -1508,9 +1486,6 @@ local function OnMerchantShow()
         return
     end
 
-    -- Never open chests while vendor is up (UseContainerItem would sell them).
-    StopChestOpen(true)
-
     merchantOpen = true
     -- Sell/destroy is manual only (bag "Sell Zone" button) for safety.
     -- Opening a merchant never auto-sells.
@@ -1621,7 +1596,7 @@ addon:RegisterFeature(KEY, {
         C:AddDescription(
             section,
             L["Auto Vendor protect list"]
-                or "永不出售/摧毁：白名单 60407, 64820, 64149, 69496, 69508, 69502, 60408, 64821, 64150, 69501；装等 284 及以上；宝箱本身（默认 64827，以及设置中的开箱 ID）。"
+                or "永不出售/摧毁：白名单 60407, 64820, 64149, 69496, 69508, 69502, 60408, 64821, 64150, 69501, 65282（艾泽里特）；装等 284 及以上；宝箱本身（默认 64827，以及设置中的开箱 ID）。"
         )
 
         C:AddDescription(section, L["Auto Vendor: chest header"] or "|cff1784d1开箱（全账号）|r")
@@ -1728,7 +1703,7 @@ addon:RegisterFeature(KEY, {
         C:AddToggle(section, {
             label = L["Enable auto buy"] or "启用自动补货",
             desc = L["Enable auto buy desc"]
-                or "打开商人时按补货表购买材料到目标数量。可日常保持开启。",
+                or "打开商人时先按主脑任务内置规划补货，再按下方采购清单购买额外物品。可日常保持开启。",
             getFunc = function()
                 local cfg = Cfg()
                 return not cfg or cfg.buyEnabled ~= false
@@ -1881,10 +1856,29 @@ addon:RegisterFeature(KEY, {
                 ApplyListText("sell", val)
             end,
         })
+        C:AddDescription(section, (function()
+            local parts = {}
+            local preset = addon.autoVendorBrainQuestBuyList
+            if type(preset) == "table" then
+                local rows = {}
+                for id, count in pairs(preset) do
+                    rows[#rows + 1] = { id = id, count = count }
+                end
+                table.sort(rows, function(a, b)
+                    return a.id < b.id
+                end)
+                for i = 1, #rows do
+                    parts[i] = rows[i].id .. "×" .. rows[i].count
+                end
+            end
+            return L["Auto Vendor: brain quest buy"]
+                or ("|cff1784d1主脑任务内置补货（固定）|r\n" .. table.concat(parts, "，")
+                    .. "\n打开商人时自动按上表补货，不必填入下方清单。同 ID 以采购清单为准。")
+        end)())
         C:AddEditBox(section, {
-            label = L["Buy list"] or "补货表",
+            label = L["Buy list"] or "采购清单",
             desc = L["Buy list desc"]
-                or "每行一件：物品链接或 ID，空格，然后是目标数量。例如 6948 20 或 item:6948:0:0:0 20。Shift-点击可插入链接。",
+                or "仅填写额外要买的物品。每行一件：物品链接或 ID，空格，然后是目标数量。主脑任务规划已内置，不必重复填写；同 ID 以本清单为准。Shift-点击可插入链接。",
             multiline = true,
             width = "full",
             getFunc = function()

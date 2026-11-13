@@ -2,6 +2,96 @@
 
 local ADDON_NAME, addon = ...
 
+-- Fixed 主脑任务 restock; applied automatically, not shown in the editable buy list.
+-- Single source of truth: edit the table only; text is derived below.
+addon.autoVendorBrainQuestBuyList = {
+    [69473] = 300,
+    [69477] = 3,
+    [69479] = 4,
+    [69485] = 2,
+    [69487] = 1,
+    [69489] = 3,
+    [69491] = 5,
+    [69464] = 100,
+    [69466] = 30,
+    [69470] = 60,
+    [69474] = 250,
+    [69476] = 20,
+    [69480] = 6,
+    [69484] = 10,
+    [69488] = 100,
+    [69494] = 30,
+    [69469] = 50,
+    [69463] = 50,
+}
+
+do
+    local parts = {}
+    for id, count in pairs(addon.autoVendorBrainQuestBuyList) do
+        parts[#parts + 1] = { id = id, count = count }
+    end
+    table.sort(parts, function(a, b)
+        return a.id < b.id
+    end)
+    local lines = {}
+    for i = 1, #parts do
+        lines[i] = parts[i].id .. " " .. parts[i].count
+    end
+    addon.autoVendorBrainQuestBuyListText = table.concat(lines, "\n")
+end
+
+-- Shared buy-list line parser (Migrate + AutoVendor). Returns id, count.
+function addon.ParseAutoVendorBuyLine(line)
+    if not line then
+        return nil
+    end
+    line = line:match("^%s*(.-)%s*$") or ""
+    if line == "" then
+        return nil
+    end
+
+    local id, rest
+    local linkStart, linkEnd, linkId = line:find("|c%x%x%x%x%x%x%x%x|Hitem:(%d+).-|h.-|h|r")
+    if not linkId then
+        linkStart, linkEnd, linkId = line:find("|Hitem:(%d+).-|h.-|h|r")
+    end
+    if not linkId then
+        linkStart, linkEnd, linkId = line:find("|Hitem:(%d+)")
+    end
+    if not linkId then
+        linkStart, linkEnd, linkId = line:find("item:(%d+)[:%d]*")
+    end
+
+    if linkId then
+        id = tonumber(linkId)
+        rest = (line:sub(1, linkStart - 1) .. line:sub(linkEnd + 1))
+        rest = rest:match("^%s*(.-)%s*$") or ""
+    else
+        local plainId, trailing = line:match("^(%d+)%s+(.+)$")
+        id = tonumber(plainId)
+        rest = trailing and (trailing:match("^%s*(.-)%s*$") or "") or ""
+    end
+
+    local count = rest and tonumber(rest:match("^(%d+)$"))
+    if id and count and count > 0 then
+        return id, count
+    end
+    return nil
+end
+
+-- Extract item id from a buy-list line even when count is missing (migration helpers).
+function addon.ParseAutoVendorBuyLineItemID(line)
+    local id = addon.ParseAutoVendorBuyLine(line)
+    if id then
+        return id
+    end
+    if not line or line == "" then
+        return nil
+    end
+    id = line:match("|Hitem:(%d+)") or line:match("item:(%d+)") or line:match("^%s*(%d+)%s*")
+    return tonumber(id)
+end
+
 addon.defaults = {
     profile = {
         features = {
@@ -152,28 +242,9 @@ addon.defaults = {
             sellInterval = 0.2,
             chatFeedback = true,
             sellList = {},
-            buyList = {                 -- quest restock preset (all characters)
-                [69473] = 300,
-                [69477] = 3,
-                [69479] = 4,
-                [69485] = 2,
-                [69487] = 1,
-                [69489] = 3,
-                [69491] = 5,
-                [69464] = 100,
-                [69466] = 30,
-                [69470] = 60,
-                [69474] = 250,
-                [69476] = 20,
-                [69480] = 6,
-                [69484] = 10,
-                [69488] = 100,
-                [69494] = 30,
-                [69469] = 50,
-                [69463] = 50,
-            },
+            buyList = {},               -- extra items only; 主脑任务 preset is built-in
             sellListText = "",
-            buyListText = "69473 300\n69477 3\n69479 4\n69485 2\n69487 1\n69489 3\n69491 5\n69464 100\n69466 30\n69470 60\n69474 250\n69476 20\n69480 6\n69484 10\n69488 100\n69494 30\n69469 50\n69463 50",
+            buyListText = "",
         },
     },
     global = {

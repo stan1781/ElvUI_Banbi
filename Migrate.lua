@@ -152,8 +152,9 @@ function addon:Migrate()
                 if type(old.global.equipment) == "table" then
                     CopyTable(old.global.equipment, g.equipment)
                 end
-            if type(old.global.friendSync) == "table" then
-                CopyTable(old.global.friendSync, g.friendSync)
+                if type(old.global.friendSync) == "table" then
+                    CopyTable(old.global.friendSync, g.friendSync)
+                end
             end
         end
     end
@@ -191,74 +192,69 @@ function addon:Migrate()
         end
     end
 
-    -- Seed the default quest restock list once, if this character has no buy list yet.
+    -- Clean editable buy list: drop legacy 44615 and built-in 主脑任务 preset rows
+    -- (preset is always applied at purchase time now). Keep one-shot flags for older
+    -- characters that already ran the previous split migrations.
     do
         local char = addon.db.char
-        if type(char) == "table" and not char.autoVendorDefaultBuyList then
+        if type(char) == "table" then
+            -- Preserve historical flags so re-login does not re-touch lists.
             char.autoVendorDefaultBuyList = true
-            local dst = char.autoVendor
-            if type(dst) ~= "table" then
-                dst = {}
-                char.autoVendor = dst
-            end
-            local emptyList = type(dst.buyList) ~= "table"
-            if not emptyList then
-                emptyList = true
-                for _ in pairs(dst.buyList) do
-                    emptyList = false
-                    break
-                end
-            end
-            local emptyText = type(dst.buyListText) ~= "string" or dst.buyListText == ""
-            if emptyList and emptyText then
-                local def = addon.defaults and addon.defaults.char and addon.defaults.char.autoVendor
-                if type(def) == "table" then
-                    dst.buyList = {}
-                    if type(def.buyList) == "table" then
-                        for id, count in pairs(def.buyList) do
-                            dst.buyList[id] = count
-                        end
-                    end
-                    dst.buyListText = def.buyListText or ""
-                end
-            end
-        end
-    end
+            local alreadyCleaned = char.autoVendorBrainQuestBuyMoved and char.autoVendorRemoveBuy44615
+            if not alreadyCleaned then
+                char.autoVendorBrainQuestBuyMoved = true
+                char.autoVendorRemoveBuy44615 = true
 
-    -- Remove priest reagent 44615 from the previously seeded default buy list.
-    do
-        local char = addon.db.char
-        if type(char) == "table" and not char.autoVendorRemoveBuy44615 then
-            char.autoVendorRemoveBuy44615 = true
-            local dst = char.autoVendor
-            if type(dst) == "table" then
-                if type(dst.buyList) == "table" then
-                    dst.buyList[44615] = nil
-                    dst.buyList["44615"] = nil
-                end
-                if type(dst.buyListText) == "string" and dst.buyListText ~= "" then
-                    local lines = {}
-                    local text = dst.buyListText:gsub("\r\n", "\n"):gsub("\r", "\n")
-                    for line in (text .. "\n"):gmatch("(.-)\n") do
-                        local keep = true
-                        if line:match("item:44615") or line:match("|Hitem:44615") then
-                            keep = false
-                        else
-                            local id = line:match("^%s*(%d+)%s")
-                            if tonumber(id) == 44615 then
-                                keep = false
+                local dst = char.autoVendor
+                local preset = addon.autoVendorBrainQuestBuyList
+                if type(dst) == "table" then
+                    if type(dst.buyList) == "table" then
+                        dst.buyList[44615] = nil
+                        dst.buyList["44615"] = nil
+                        if type(preset) == "table" then
+                            local remove = {}
+                            for key, count in pairs(dst.buyList) do
+                                local id = tonumber(key)
+                                if id and preset[id] and tonumber(count) == tonumber(preset[id]) then
+                                    remove[#remove + 1] = key
+                                end
+                            end
+                            for i = 1, #remove do
+                                dst.buyList[remove[i]] = nil
                             end
                         end
-                        if keep and line ~= "" then
-                            lines[#lines + 1] = line
-                        elseif keep then
-                            -- preserve trailing/empty lines only if they were meaningful; drop bare empties from strip
-                        end
                     end
-                    dst.buyListText = table.concat(lines, "\n")
+
+                    if type(dst.buyListText) == "string" and dst.buyListText ~= "" then
+                        local kept = {}
+                        local text = dst.buyListText:gsub("\r\n", "\n"):gsub("\r", "\n")
+                        local parseLine = addon.ParseAutoVendorBuyLine
+                        local parseId = addon.ParseAutoVendorBuyLineItemID
+                        for line in (text .. "\n"):gmatch("(.-)\n") do
+                            if line ~= "" then
+                                local drop = false
+                                local id, count
+                                if parseLine then
+                                    id, count = parseLine(line)
+                                end
+                                if not id and parseId then
+                                    id = parseId(line)
+                                end
+                                if id == 44615 then
+                                    drop = true
+                                elseif id and count and type(preset) == "table"
+                                    and preset[id] and count == tonumber(preset[id]) then
+                                    drop = true
+                                end
+                                if not drop then
+                                    kept[#kept + 1] = line
+                                end
+                            end
+                        end
+                        dst.buyListText = table.concat(kept, "\n")
+                    end
                 end
             end
         end
     end
-end
 end
