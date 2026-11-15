@@ -288,12 +288,30 @@ local function BuildOptions()
         order = 85,
         childGroups = "tab",
         args = {
-            general = BuildTabFromFeatures(L["General"] or "General", 1, {
-                "motionSpeed",
-                "infoBar",
-                "moneyFormat",
-                "autoLearnRecipes",
-            }, true),
+            general = (function()
+                local general = BuildTabFromFeatures(L["General"] or "General", 1, {
+                    "motionSpeed",
+                    "infoBar",
+                    "moneyFormat",
+                    "autoLearnRecipes",
+                }, true)
+                general.args.minimapButton = {
+                    type = "toggle",
+                    name = L["Show minimap button"] or "显示小地图按钮",
+                    desc = L["Show minimap button desc"]
+                        or "在小地图旁显示图标，左键打开 Banbi 设置，拖动可调整位置。",
+                    order = 0,
+                    get = function()
+                        return not addon.IsMinimapButtonShown or addon:IsMinimapButtonShown()
+                    end,
+                    set = function(_, value)
+                        if addon.SetMinimapButtonShown then
+                            addon:SetMinimapButtonShown(value and true or false)
+                        end
+                    end,
+                }
+                return general
+            end)(),
             vendor = BuildTabFromFeatures(L["Vendor"] or "Vendor", 2, {
                 "autoVendor",
             }, false),

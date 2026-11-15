@@ -328,6 +328,10 @@ addon.defaults = {
                 autoCleanOnLogin = true,
             },
         },
+        minimapButton = {
+            hide = false,
+            angle = 225,
+        },
         -- Shared across characters: open legendary chests (auto-loot is game-side).
         chestOpen = {
             itemID = 64827, -- 艾泽拉斯传奇宝箱
