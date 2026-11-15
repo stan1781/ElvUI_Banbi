@@ -14,7 +14,7 @@ addon.autoVendorBrainQuestBuyList = {
     [69491] = 5,
     [69464] = 100,
     [69466] = 30,
-    [69470] = 60,
+    [69470] = 40,
     [69474] = 250,
     [69476] = 20,
     [69480] = 6,
@@ -23,7 +23,90 @@ addon.autoVendorBrainQuestBuyList = {
     [69494] = 30,
     [69469] = 50,
     [69463] = 50,
+    [69462] = 5,
+    [69460] = 1,
 }
+
+-- Display names and stage order for the options panel (贝壳 69461 is intentionally omitted).
+addon.autoVendorBrainQuestBuyNames = {
+    [69488] = "没有洞的大鲨鱼之牙",
+    [69469] = "剃刀鳗幼体",
+    [69474] = "进食充分的医生鱼",
+    [69484] = "刚刚蜕下的螃蟹皮",
+    [69463] = "光鳞亮粉",
+    [69485] = "巨大的巨人脚趾",
+    [69479] = "龙虾人的眼睛",
+    [69487] = "偶然切掉的海马鳍",
+    [69477] = "闪红的海蛇鳞",
+    [69470] = "共生浮游生物",
+    [69462] = "闪烁的鱼人皮润滑剂",
+    [69466] = "凡图斯黑鱿鱼墨水",
+    [69494] = "超级滑的鳗鱼粘液",
+    [69489] = "覆盖岩层的海螺壳",
+    [69480] = "强力的蜗牛粘液",
+    [69473] = "非常漂亮的珊瑚",
+    [69464] = "虹色闪光鳐之皮",
+    [69476] = "奢侈的奢鳞之鳞",
+    [69491] = "捕获的空穴气泡",
+    [69460] = "全视之眼",
+}
+
+addon.autoVendorBrainQuestBuyOrder = {
+    69488, 69469, 69474, 69484, 69463,
+    69485, 69479, 69487, 69477, 69470, 69462,
+    69466, 69494, 69489, 69480,
+    69473, 69464, 69476, 69491,
+    69460,
+}
+
+function addon.FormatAutoVendorBrainQuestBuyText()
+    local L = addon.L or {}
+    local list = addon.autoVendorBrainQuestBuyList
+    local names = addon.autoVendorBrainQuestBuyNames or {}
+    local order = addon.autoVendorBrainQuestBuyOrder
+    local lines = {}
+    local seen = {}
+
+    local function addLine(id)
+        local count = list and list[id]
+        if not count then
+            return
+        end
+        seen[id] = true
+        local name = names[id]
+        if (not name or name == "") and GetItemInfo then
+            name = GetItemInfo(id)
+        end
+        if name and name ~= "" then
+            lines[#lines + 1] = name .. "  " .. id .. "×" .. count
+        else
+            lines[#lines + 1] = id .. "×" .. count
+        end
+    end
+
+    if type(order) == "table" then
+        for i = 1, #order do
+            addLine(order[i])
+        end
+    end
+    if type(list) == "table" then
+        local extra = {}
+        for id in pairs(list) do
+            if not seen[id] then
+                extra[#extra + 1] = id
+            end
+        end
+        table.sort(extra)
+        for i = 1, #extra do
+            addLine(extra[i])
+        end
+    end
+
+    local header = L["Auto Vendor: brain quest buy"] or "|cff1784d1主脑任务内置补货（固定）|r"
+    local footer = L["Auto Vendor: brain quest buy footer"]
+        or "打开商人时自动按上表补货，不必填入上方的采购清单。同 ID 以采购清单为准。"
+    return header .. "\n" .. table.concat(lines, "\n") .. "\n" .. footer
+end
 
 do
     local parts = {}

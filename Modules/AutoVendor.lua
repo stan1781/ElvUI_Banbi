@@ -469,12 +469,7 @@ local function StopTicker()
 end
 
 local function SellInterval()
-    local cfg = Cfg()
-    local interval = cfg and tonumber(cfg.sellInterval) or 0.2
-    if interval < 0.05 then
-        interval = 0.05
-    end
-    return interval
+    return 0.2
 end
 
 local function PrintSummary()
@@ -971,7 +966,7 @@ local function BuildQueue(force)
     end
     local maxCorruption = tonumber(cfg.maxCorruption) or 0
     local destroyUnsellable = cfg.destroyUnsellable and true or false
-    local order = cfg.scanOrder or "asc"
+    local order = "asc"
     local chestCfg = ChestCfg()
     local configuredChestID = chestCfg and tonumber(chestCfg.itemID) or nil
 
@@ -1072,12 +1067,7 @@ local function StopChestTicker()
 end
 
 local function ChestInterval()
-    local cfg = ChestCfg()
-    local interval = cfg and tonumber(cfg.interval) or 0.4
-    if interval < 0.1 then
-        interval = 0.1
-    end
-    return interval
+    return 0.4
 end
 
 local function IsMerchantFrameOpen()
@@ -1186,7 +1176,7 @@ local function BuildChestQueue()
     ClearChestQueue()
     local cfg = ChestCfg()
     local itemID = tonumber(cfg and cfg.itemID) or DEFAULT_CHEST_ID
-    local order = (cfg and cfg.scanOrder == "desc") and "desc" or "asc"
+    local order = "asc"
     local limit = cfg and tonumber(cfg.scanSlotLimit) or 0
     if limit and limit < 0 then
         limit = 0
@@ -1588,17 +1578,6 @@ addon:RegisterFeature(KEY, {
     OnEnable = OnEnable,
     OnDisable = OnDisable,
     BuildOptions = function(section, C)
-        C:AddDescription(
-            section,
-            L["Auto Vendor Help"]
-                or "出售/摧毁仅由背包「出售区」按钮手动触发。白名单物品、装等 284 及以上、以及箱子本身永不出售/摧毁。流程：开箱 → 开商人 → 点出售区。"
-        )
-        C:AddDescription(
-            section,
-            L["Auto Vendor protect list"]
-                or "永不出售/摧毁：白名单 60407, 64820, 64149, 69496, 69508, 69502, 60408, 64821, 64150, 69501, 65282（艾泽里特）；装等 284 及以上；宝箱本身（默认 64827，以及设置中的开箱 ID）。"
-        )
-
         C:AddDescription(section, L["Auto Vendor: chest header"] or "|cff1784d1开箱（全账号）|r")
         C:AddEditBox(section, {
             label = L["Chest item ID"] or "宝箱物品 ID",
@@ -1611,40 +1590,6 @@ addon:RegisterFeature(KEY, {
                 local cfg = ChestCfg()
                 if cfg then
                     cfg.itemID = tonumber(val) or DEFAULT_CHEST_ID
-                end
-            end,
-        })
-        C:AddSlider(section, {
-            label = L["Chest open interval"] or "开箱间隔",
-            desc = L["Chest open interval desc"] or "每只宝箱之间的间隔（秒）。拾取由游戏自动完成。",
-            min = 0.1,
-            max = 1.5,
-            step = 0.05,
-            getFunc = function()
-                local cfg = ChestCfg()
-                return (cfg and tonumber(cfg.interval)) or 0.4
-            end,
-            setFunc = function(val)
-                local cfg = ChestCfg()
-                if cfg then
-                    cfg.interval = val
-                end
-            end,
-        })
-        C:AddSelect(section, {
-            label = L["Chest scan order"] or "开箱扫描顺序",
-            values = {
-                asc = L["Scan order: ascending"] or "正序（背包 0→4）",
-                desc = L["Scan order: descending"] or "倒序（背包 4→0）",
-            },
-            getFunc = function()
-                local cfg = ChestCfg()
-                return (cfg and cfg.scanOrder == "desc") and "desc" or "asc"
-            end,
-            setFunc = function(val)
-                local cfg = ChestCfg()
-                if cfg then
-                    cfg.scanOrder = (val == "desc") and "desc" or "asc"
                 end
             end,
         })
@@ -1715,31 +1660,8 @@ addon:RegisterFeature(KEY, {
                 end
             end,
         })
-        C:AddSelect(section, {
-            label = L["Scan order"] or "扫描顺序",
-            desc = L["Scan order desc"]
-                or "出售区与贩卖列表按此顺序数格子（空格也计入）。默认正序与整理背包填充方向一致（行囊 0 → 扩展包 4）。",
-            values = {
-                asc = L["Scan order: ascending"] or "正序（背包 0→4）",
-                desc = L["Scan order: descending"] or "倒序（背包 4→0）",
-            },
-            getFunc = function()
-                local cfg = Cfg()
-                local order = cfg and cfg.scanOrder or "asc"
-                if order ~= "desc" then
-                    order = "asc"
-                end
-                return order
-            end,
-            setFunc = function(val)
-                local cfg = Cfg()
-                if cfg then
-                    cfg.scanOrder = (val == "desc") and "desc" or "asc"
-                end
-            end,
-        })
         C:AddSlider(section, {
-            label = L["Scan slot limit"] or "扫描格数上限",
+            label = L["Scan slot limit"] or "出售扫描格数上限",
             desc = L["Scan slot limit desc"]
                 or "只扫描顺序中的前 N 格（空格也计 1）。贩卖列表与出售区都不会超出此范围。默认 80，更安全；0 表示不限制（扫完全部背包）。",
             min = 0,
@@ -1811,23 +1733,6 @@ addon:RegisterFeature(KEY, {
                 end
             end,
         })
-        C:AddSlider(section, {
-            label = L["Sell interval"] or "出售间隔",
-            desc = L["Sell interval desc"] or "每件出售或摧毁之间的间隔（秒）。",
-            min = 0.05,
-            max = 1.0,
-            step = 0.05,
-            getFunc = function()
-                local cfg = Cfg()
-                return (cfg and tonumber(cfg.sellInterval)) or 0.2
-            end,
-            setFunc = function(val)
-                local cfg = Cfg()
-                if cfg then
-                    cfg.sellInterval = val
-                end
-            end,
-        })
         C:AddToggle(section, {
             label = L["Chat feedback"] or "聊天栏反馈",
             desc = L["Chat feedback desc"] or "交易结束后在聊天栏显示售出、摧毁和购入的摘要。",
@@ -1846,8 +1751,8 @@ addon:RegisterFeature(KEY, {
             label = L["Sell list"] or "贩卖列表",
             desc = L["Sell list desc"]
                 or "每行一件：Shift-点击物品链接，或直接填写物品 ID。例如 6948 或 item:6948:0:0:0。",
-            multiline = true,
-            width = "full",
+            multiline = 8,
+            width = 1.7,
             getFunc = function()
                 local cfg = Cfg()
                 return (cfg and cfg.sellListText) or ""
@@ -1856,31 +1761,12 @@ addon:RegisterFeature(KEY, {
                 ApplyListText("sell", val)
             end,
         })
-        C:AddDescription(section, (function()
-            local parts = {}
-            local preset = addon.autoVendorBrainQuestBuyList
-            if type(preset) == "table" then
-                local rows = {}
-                for id, count in pairs(preset) do
-                    rows[#rows + 1] = { id = id, count = count }
-                end
-                table.sort(rows, function(a, b)
-                    return a.id < b.id
-                end)
-                for i = 1, #rows do
-                    parts[i] = rows[i].id .. "×" .. rows[i].count
-                end
-            end
-            return L["Auto Vendor: brain quest buy"]
-                or ("|cff1784d1主脑任务内置补货（固定）|r\n" .. table.concat(parts, "，")
-                    .. "\n打开商人时自动按上表补货，不必填入下方清单。同 ID 以采购清单为准。")
-        end)())
         C:AddEditBox(section, {
             label = L["Buy list"] or "采购清单",
             desc = L["Buy list desc"]
-                or "仅填写额外要买的物品。每行一件：物品链接或 ID，空格，然后是目标数量。主脑任务规划已内置，不必重复填写；同 ID 以本清单为准。Shift-点击可插入链接。",
-            multiline = true,
-            width = "full",
+                or "仅填写额外要买的物品。每行一件：物品链接或 ID，空格，然后是目标数量。主脑任务规划已内置，不必重复填写；同 ID 以采购清单为准。Shift-点击可插入链接。",
+            multiline = 8,
+            width = 1.7,
             getFunc = function()
                 local cfg = Cfg()
                 return (cfg and cfg.buyListText) or ""
@@ -1889,5 +1775,21 @@ addon:RegisterFeature(KEY, {
                 ApplyListText("buy", val)
             end,
         })
+        C:AddDescription(
+            section,
+            L["Auto Vendor Help"]
+                or "出售/摧毁仅由背包「出售区」按钮手动触发。装备碎片、装等 284 及以上、以及箱子本身永不出售/摧毁。流程：开箱 → 开商人 → 点出售区。"
+        )
+        C:AddDescription(
+            section,
+            L["Auto Vendor protect list"]
+                or "永不出售/摧毁：装备碎片；装等 284 及以上；宝箱本身（默认 64827，以及设置中的开箱 ID）。"
+        )
+        C:AddDescription(section, function()
+            if addon.FormatAutoVendorBrainQuestBuyText then
+                return addon.FormatAutoVendorBrainQuestBuyText()
+            end
+            return L["Auto Vendor: brain quest buy"] or "|cff1784d1主脑任务内置补货（固定）|r"
+        end)
     end,
 })
