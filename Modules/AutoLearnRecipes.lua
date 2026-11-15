@@ -134,21 +134,6 @@ local function ResolveCanonical(name)
     return best
 end
 
-local function IsProfessionEnabled(canonical)
-    local cfg = Cfg()
-    if not cfg then
-        return true
-    end
-    local map = cfg.professions
-    if type(map) ~= "table" then
-        return true
-    end
-    if map[canonical] == nil then
-        return true
-    end
-    return map[canonical] and true or false
-end
-
 local function ScanProfessionSkills()
     local found = {} -- canonical → { rank, maxRank }
     local n = GetNumSkillLines and GetNumSkillLines() or 0
@@ -171,16 +156,9 @@ local function FireLearn(canonical, delayed)
     if not canonical or sessionFired[canonical] or pendingFire[canonical] then
         return
     end
-    if not IsProfessionEnabled(canonical) then
-        return
-    end
-
     local function doSend()
         pendingFire[canonical] = nil
         if not active or sessionFired[canonical] then
-            return
-        end
-        if not IsProfessionEnabled(canonical) then
             return
         end
         sessionFired[canonical] = true
@@ -423,26 +401,6 @@ addon:RegisterFeature(KEY, {
                 end
             end,
         })
-        C:AddDescription(section, L["AutoLearn: professions header"] or "启用的专业")
-        for i = 1, #PROFESSION_ORDER do
-            local name = PROFESSION_ORDER[i]
-            C:AddToggle(section, {
-                label = name,
-                getFunc = function()
-                    return IsProfessionEnabled(name)
-                end,
-                setFunc = function(val)
-                    local cfg = Cfg()
-                    if not cfg then
-                        return
-                    end
-                    if type(cfg.professions) ~= "table" then
-                        cfg.professions = {}
-                    end
-                    cfg.professions[name] = val and true or false
-                end,
-            })
-        end
         C:AddButton(section, {
             label = L["AutoLearn: clear session"] or "清空本会话已发送记录",
             desc = L["AutoLearn: clear session desc"] or "允许同一次登录内对同一专业再次自动发送。",

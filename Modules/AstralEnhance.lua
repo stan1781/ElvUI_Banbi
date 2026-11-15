@@ -90,15 +90,7 @@ local function After(delay, fn)
 end
 
 local function GetDelay()
-    local cfg = Cfg()
-    local d = cfg and cfg.clickDelay
-    if type(d) ~= "number" or d < 0.2 then
-        return 0.45
-    end
-    if d > 2 then
-        return 2
-    end
-    return d
+    return 0.45
 end
 
 local function GetTargetLevel()
@@ -1039,22 +1031,6 @@ addon:RegisterFeature(KEY, {
                 local cfg = Cfg()
                 if cfg then
                     cfg.targetLevel = val
-                end
-            end,
-        })
-        C:AddSlider(_, {
-            label = L["Astral click delay"],
-            desc = L["Astral click delay desc"],
-            min = 0.2,
-            max = 1.5,
-            step = 0.05,
-            getFunc = function()
-                return GetDelay()
-            end,
-            setFunc = function(val)
-                local cfg = Cfg()
-                if cfg then
-                    cfg.clickDelay = val
                 end
             end,
         })

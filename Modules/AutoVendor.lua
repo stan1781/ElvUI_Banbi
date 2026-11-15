@@ -77,7 +77,6 @@ local warnedCursor = false
 local chestQueue = {}
 local chestTicker
 local chestOpened = 0
-local chestSlashRegistered = false
 
 -- Per-character vendor settings (AceDB char.autoVendor).
 local function Cfg()
@@ -1520,30 +1519,12 @@ local function EnsureFrame()
     return eventFrame
 end
 
-local function RegisterChestSlash()
-    if chestSlashRegistered then
-        return
-    end
-    chestSlashRegistered = true
-    if addon.core and addon.core.RegisterChatCommand then
-        addon.core:RegisterChatCommand("banbichest", function(input)
-            input = string.lower(tostring(input or ""))
-            if find(input, "stop", 1, true) then
-                StopChestOpen(false)
-            else
-                StartChestOpen()
-            end
-        end)
-    end
-end
-
 local function OnEnable()
     active = true
     SyncListsFromText()
     EnsureFrame()
     eventFrame:RegisterEvent("MERCHANT_SHOW")
     eventFrame:RegisterEvent("MERCHANT_CLOSED")
-    RegisterChestSlash()
     EnsureBagButtons()
 
     if MerchantFrame and MerchantFrame.IsShown and MerchantFrame:IsShown() then
@@ -1623,11 +1604,6 @@ addon:RegisterFeature(KEY, {
                 end
             end,
         })
-        C:AddDescription(
-            section,
-            L["Chest open via bag"]
-                or "开箱请用 ElvUI 背包栏按钮（左键开始 / 右键停止），或命令 /banbichest、/banbichest stop。"
-        )
 
         C:AddDescription(section, L["Auto Vendor: sell header"] or "|cff1784d1贩卖 / 补货（按角色）|r")
         C:AddToggle(section, {

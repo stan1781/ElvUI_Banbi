@@ -182,12 +182,9 @@ local function EnsureDB()
 	if type(db.settings) ~= "table" then
 		db.settings = {}
 	end
-	if db.settings.autoSyncOnLogin == nil then
-		db.settings.autoSyncOnLogin = true
-	end
-	if db.settings.autoCleanOnLogin == nil then
-		db.settings.autoCleanOnLogin = true
-	end
+	-- Forced on: login auto-add and auto-clean (no per-character toggle).
+	db.settings.autoSyncOnLogin = true
+	db.settings.autoCleanOnLogin = true
 	return db
 end
 
@@ -836,7 +833,7 @@ function FriendSync:SetAutoSyncOnLogin(enabled)
 end
 
 function FriendSync:IsAutoSyncOnLogin()
-	return EnsureDB().settings.autoSyncOnLogin and true or false
+	return true
 end
 
 function FriendSync:SetAutoCleanOnLogin(enabled)
@@ -847,8 +844,7 @@ function FriendSync:SetAutoCleanOnLogin(enabled)
 end
 
 function FriendSync:IsAutoCleanOnLogin()
-	local db = EnsureDB()
-	return db.settings.autoCleanOnLogin ~= false
+	return true
 end
 
 function FriendSync:ListPool(limit)
@@ -1137,22 +1133,6 @@ addon:RegisterFeature(KEY, {
 	OnDisable = OnDisable,
 	BuildOptions = function(section, C)
 		C:AddDescription(section, L["Use the buttons below, or add/remove friend (sync) from the player context menu. Alliance and Horde pools are separate."])
-		C:AddToggle(section, {
-			label = L["Auto-add on login"],
-			desc = L["On login, add friends from the shared pool that are missing on this character."],
-			getFunc = function() return FriendSync:IsAutoSyncOnLogin() end,
-			setFunc = function(val)
-				EnsureDB().settings.autoSyncOnLogin = val and true or false
-			end,
-		})
-		C:AddToggle(section, {
-			label = L["Auto-clean on login"],
-			desc = L["On login, remove friends on the deleted list and extras not in the shared pool."],
-			getFunc = function() return FriendSync:IsAutoCleanOnLogin() end,
-			setFunc = function(val)
-				EnsureDB().settings.autoCleanOnLogin = val and true or false
-			end,
-		})
 		C:AddButton(section, {
 			label = L["Collect current friends"],
 			callback = function() FriendSync:CollectFromCurrent(false) end,

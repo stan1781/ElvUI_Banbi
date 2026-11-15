@@ -314,7 +314,6 @@ L["Chest scan order"] = true
 L["Chest scan slot limit"] = true
 L["Chest scan slot limit desc"] = "Only scan the first N slots when finding chests; 0 scans all bags."
 L["Chest chat feedback"] = true
-L["Chest open via bag"] = "Use the ElvUI bag bar buttons (left-click start / right-click stop), or /banbichest and /banbichest stop."
 L["AutoVendor: chests opened"] = "Opened %d chest(s). You can talk to a merchant to auto-clean."
 L["AutoVendor: no chests"] = "No matching chests found in bags."
 L["AutoVendor: chest stop merchant"] = "Merchant window opened; stopped opening chests."
