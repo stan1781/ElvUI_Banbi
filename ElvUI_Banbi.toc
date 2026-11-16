@@ -19,6 +19,7 @@ Migrate.lua
 Options.lua
 
 Modules\MinimapButton.lua
+Modules\DayTime.lua
 Modules\ClientCompat.lua
 Modules\MoneyFormat.lua
 Modules\MotionSpeed.lua

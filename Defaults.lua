@@ -332,6 +332,10 @@ addon.defaults = {
             hide = false,
             angle = 225,
         },
+        dayTime = {
+            enabled = true,
+            hour = 10,
+        },
         -- Shared across characters: open legendary chests (auto-loot is game-side).
         chestOpen = {
             itemID = 64827, -- 艾泽拉斯传奇宝箱

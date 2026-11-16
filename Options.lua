@@ -310,6 +310,21 @@ local function BuildOptions()
                         end
                     end,
                 }
+                general.args.dayTime = {
+                    type = "toggle",
+                    name = L["Lock day time"] or "固定一天中的时间",
+                    desc = L["Lock day time desc"]
+                        or "登录后将天体「一天中的时间」固定为上午 10 点，避免夜晚过暗。关闭则恢复跟随本机时间。",
+                    order = 0.5,
+                    get = function()
+                        return not addon.IsDayTimeLocked or addon:IsDayTimeLocked()
+                    end,
+                    set = function(_, value)
+                        if addon.SetDayTimeLocked then
+                            addon:SetDayTimeLocked(value and true or false)
+                        end
+                    end,
+                }
                 return general
             end)(),
             vendor = BuildTabFromFeatures(L["Vendor"] or "Vendor", 2, {
