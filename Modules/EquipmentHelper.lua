@@ -224,18 +224,28 @@ local function PersistPosition()
     if not mainFrame then return end
     local cfg = Cfg()
     if not cfg then return end
-    local point, _, _, x, y = mainFrame:GetPoint(1)
-    cfg.anchor = point or "CENTER"
-    cfg.posX = x or 0
-    cfg.posY = y or -180
+    -- mover 接管后 GetPoint 相对的是 mover（常为 0,0），要用屏幕中心差保存真实位置
+    local source = mainFrame.mover or mainFrame
+    local cx, cy = source:GetCenter()
+    local px, py = UIParent:GetCenter()
+    if not cx or not cy or not px or not py then
+        return
+    end
+    cfg.anchor = "CENTER"
+    cfg.posX = cx - px
+    cfg.posY = cy - py
 end
 
 local function ApplyPosition()
     if not mainFrame then return end
     local cfg = Cfg() or {}
+    mainFrame:SetScale(cfg.scale or 1)
+    -- ElvUI mover 接管锚点后，不要再 ClearAllPoints 打断绑定
+    if mainFrame.mover then
+        return
+    end
     mainFrame:ClearAllPoints()
     mainFrame:SetPoint(cfg.anchor or "CENTER", UIParent, cfg.anchor or "CENTER", cfg.posX or 0, cfg.posY or -180)
-    mainFrame:SetScale(cfg.scale or 1)
 end
 
 local function ResetPosition()
@@ -246,6 +256,24 @@ local function ResetPosition()
         cfg.posX = d.posX
         cfg.posY = d.posY
         cfg.scale = d.scale
+    end
+    if mainFrame and mainFrame.mover then
+        local E = addon:GetE()
+        if E and E.ResetMovers then
+            E:ResetMovers(L["Equipment Helper"] or "Equipment Helper")
+        end
+        if mainFrame.mover then
+            mainFrame.mover:ClearAllPoints()
+            mainFrame.mover:SetPoint(
+                "CENTER",
+                UIParent,
+                "CENTER",
+                (d and d.posX) or 0,
+                (d and d.posY) or -180
+            )
+        end
+        mainFrame:SetScale((cfg and cfg.scale) or 1)
+        return
     end
     ApplyPosition()
 end
@@ -273,6 +301,8 @@ local function CreateMainFrame()
     mainFrame:SetScript("OnDragStart", function(self)
         if not IsShiftKeyDown() then return end
         if InCombatLockdown and InCombatLockdown() then return end
+        -- 已注册 ElvUI 锚点时由解锁定位拖动，Shift 拖动会打断 mover 绑定
+        if self.mover then return end
         isDragging = true
         self:StartMoving()
     end)
@@ -285,7 +315,12 @@ local function CreateMainFrame()
     mainFrame:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["Equipment Helper"], 1, 1, 1)
-        GameTooltip:AddLine(L["Shift+drag to move. Right-click a set to bind talent/PvP/challenge."], 0.7, 0.7, 0.7)
+        if self.mover then
+            GameTooltip:AddLine(L["Move via ElvUI Movers. Right-click a set to bind talent/PvP/challenge."]
+                or "Move via ElvUI Movers. Right-click a set to bind talent/PvP/challenge.", 0.7, 0.7, 0.7)
+        else
+            GameTooltip:AddLine(L["Shift+drag to move. Right-click a set to bind talent/PvP/challenge."], 0.7, 0.7, 0.7)
+        end
         GameTooltip:Show()
     end)
     mainFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -573,6 +608,7 @@ local function CreateEquipmentButton(parent, index)
     button:SetScript("OnDragStart", function()
         if not IsShiftKeyDown() or not mainFrame then return end
         if InCombatLockdown and InCombatLockdown() then return end
+        if mainFrame.mover then return end
         isDragging = true
         mainFrame:StartMoving()
     end)
@@ -630,7 +666,12 @@ function EH:UpdateButtons()
     local numSets = GetNumEquipmentSets()
     local buttonCount = math.min(numSets, 10)
     local buttonSize, spacing = 24, 3
-    mainFrame:SetWidth(10 + buttonCount * (buttonSize + spacing) - spacing)
+    local width = 10 + buttonCount * (buttonSize + spacing) - spacing
+    mainFrame:SetWidth(width)
+    if mainFrame.mover then
+        mainFrame.mover:SetWidth(width)
+        mainFrame.mover:SetHeight(mainFrame:GetHeight())
+    end
 
     for i = 1, buttonCount do
         local name, icon = GetEquipmentSetInfo(i)
