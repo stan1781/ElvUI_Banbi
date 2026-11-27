@@ -861,12 +861,44 @@ local function ToggleRun()
     end
 end
 
+local panelUserHidden = false
+local EnsurePanel -- forward decl for ShowPanel/TogglePanel
+
+local function ShowPanel()
+    EnsurePanel()
+    panelUserHidden = false
+    if panel then
+        panel:Show()
+    end
+end
+
+local function HidePanel()
+    panelUserHidden = true
+    if running then
+        StopRun(L["Astral: stopped"] or "已停止")
+    end
+    if panel then
+        panel:Hide()
+    end
+end
+
+local function TogglePanel()
+    EnsurePanel()
+    if panel and panel:IsShown() then
+        HidePanel()
+    else
+        ShowPanel()
+    end
+end
+
 local function UpdatePanelVisibility()
     if not panel then
         return
     end
     if addon:IsFeatureEnabled(KEY) then
-        panel:Show()
+        if not panelUserHidden then
+            panel:Show()
+        end
     else
         panel:Hide()
         if running then
@@ -875,7 +907,7 @@ local function UpdatePanelVisibility()
     end
 end
 
-local function EnsurePanel()
+EnsurePanel = function()
     if panel then
         return panel
     end
@@ -981,12 +1013,21 @@ local function OnEnable()
     eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
     if not slashRegistered and addon.core and addon.core.RegisterChatCommand then
         slashRegistered = true
-        addon.core:RegisterChatCommand("banbiastral", function(input)
-            input = lower(input or "")
-            if find(input, "stop", 1, true) then
+        addon.core:RegisterChatCommand("ae", function(input)
+            input = lower(gsub(input or "", "^%s*(.-)%s*$", "%1"))
+            if input == "" then
+                TogglePanel()
+            elseif input == "show" or input == "on" then
+                ShowPanel()
+            elseif input == "off" or input == "hide" then
+                HidePanel()
+            elseif input == "start" then
+                ShowPanel()
+                StartRun()
+            elseif input == "stop" then
                 StopRun(L["Astral: stopped"] or "已停止")
             else
-                StartRun()
+                Print(L["Astral: slash help"] or "用法：/ae | show | off | start | stop")
             end
         end)
     end

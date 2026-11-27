@@ -201,7 +201,7 @@ L["When leaving combat, restore the tracking you had before the fight (e.g. herb
 L["Astral Enhance"] = "星界强化"
 L["Astral Enhance Desc"] = "对星界铸造者/锻造者自动点非好运符强化，直到未排除的属性达到设定等级（默认 9/10）。"
 L["Astral Enhance Help"] =
-    "用法：穿齐要强化的装备 → 选中星界铸造者/锻造者 →「开始强化」或 /banbiastral。按对话装备列表逐件处理：每件未排除属性升到目标后再下一件；不点好运符。可用「装备名过滤」「跳过属性预设」或「排除属性」缩小范围。Shift+拖动面板。"
+    "用法：穿齐要强化的装备 → 选中星界铸造者/锻造者 →「开始强化」或 /ae 切换面板（/ae off 关闭）。按对话装备列表逐件处理：每件未排除属性升到目标后再下一件；不点好运符。可用「装备名过滤」「跳过属性预设」或「排除属性」缩小范围。Shift+拖动面板。"
 L["Astral target level"] = "目标强化等级"
 L["Astral target level desc"] = "每条未排除属性强化到该等级后跳过（建议 9，留 10 给好运符）。"
 L["Astral click delay"] = "点击间隔（秒）"
@@ -244,6 +244,7 @@ L["Astral: item done next"] = "[%s] 已达目标，切换下一件…"
 L["Astral: not in combat"] = "战斗中无法操作"
 L["Astral: combat stop"] = "进入战斗，已停止强化"
 L["Astral: click failed"] = "点击强化选项失败"
+L["Astral: slash help"] = "用法：/ae（切换面板）| show | off | start | stop"
 L["Auto Learn Recipes"] = "Auto Learn Recipes"
 L["Auto Learn Recipes Desc"] =
     "On learning a profession, auto-send .learn all recipes <name> (VIP). Optionally refill when opening a non-max profession."
